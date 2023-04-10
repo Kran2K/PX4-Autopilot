@@ -186,6 +186,35 @@ static bool send_vehicle_command(uint16_t cmd, float param1 = NAN, float param2 
 
 	return vcmd_pub.publish(vcmd);
 }
+
+/* added by hcnam in 21.05.03 */
+static bool send_knob_command(const float hdg_roll, const float alt, const float vel, const float hdg_roll_flag)
+{
+	PX4_INFO("send_knob_cmd in");
+	vehicle_command_s vcmd{};
+	// vcmd.command = vehicle_command_s::VEHICLE_CMD_UPDATE_KNOB;
+	vcmd.command = vehicle_command_s::VEHICLE_CMD_DO_KNOB;
+	vcmd.param1 = hdg_roll;
+	vcmd.param2 = alt;
+	vcmd.param3 = vel;
+	vcmd.param4 = NAN;
+	vcmd.param5 = (double)NAN;
+	vcmd.param6 = NAN;
+	vcmd.param7 = hdg_roll_flag;
+
+	uORB::SubscriptionData<vehicle_status_s> vehicle_status_sub{ORB_ID(vehicle_status)};
+	vcmd.source_system = vehicle_status_sub.get().system_id;
+	vcmd.target_system = vehicle_status_sub.get().system_id;
+	vcmd.source_component = vehicle_status_sub.get().component_id;
+	vcmd.target_component = vehicle_status_sub.get().component_id;
+
+	uORB::Publication<vehicle_command_s> vcmd_pub{ORB_ID(vehicle_command)};
+	vcmd.timestamp = hrt_absolute_time();
+
+	PX4_INFO("Hdg/Roll: %f	Alt: %f	Vel: %f", (double)vcmd.param1, (double)vcmd.param2, (double)vcmd.param3);
+
+	return vcmd_pub.publish(vcmd);
+}
 #endif
 
 extern "C" __EXPORT int commander_main(int argc, char *argv[])
@@ -314,7 +343,17 @@ extern "C" __EXPORT int commander_main(int argc, char *argv[])
 	}
 
 	if (!strcmp(argv[1], "disarm")) {
-		send_vehicle_command(vehicle_command_s::VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.f, 0.f);
+		// send_vehicle_command(vehicle_command_s::VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.f, 0.f);
+
+		// edited by hcnam on 21.05.07
+		// allow disarming in flight
+		float param2 = 0.f;
+
+		if(argc > 2 && !strcmp(argv[2], "-f")) {
+			param2 = 21196.f;
+		}
+
+		send_vehicle_command(vehicle_command_s::VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.f, param2);
 
 		return 0;
 	}
@@ -338,6 +377,21 @@ extern "C" __EXPORT int commander_main(int argc, char *argv[])
 				     (float)(status.vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROTARY_WING ?
 					     vtol_vehicle_status_s::VEHICLE_VTOL_STATE_FW :
 					     vtol_vehicle_status_s::VEHICLE_VTOL_STATE_MC));
+
+		return 0;
+	}
+
+	/* added by hcnam in 21.05.03 */
+	if (!strcmp(argv[1], "knob_hdg")) {
+		PX4_INFO("knob_hdg in");
+		send_knob_command(std::atof(argv[2]), std::atof(argv[3]), std::atof(argv[4]), 1.0f);
+
+		return 0;
+	}
+
+	if(!strcmp(argv[1], "knob_roll")) {
+		PX4_INFO("knob_roll in");
+		send_knob_command(std::atof(argv[2]), std::atof(argv[3]), std::atof(argv[4]), -1.0f);
 
 		return 0;
 	}
@@ -389,6 +443,10 @@ extern "C" __EXPORT int commander_main(int argc, char *argv[])
 			} else if (!strcmp(argv[2], "auto:precland")) {
 				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_AUTO,
 						     PX4_CUSTOM_SUB_MODE_AUTO_PRECLAND);
+
+			/* added by hcnam 21.05.03 */
+			} else if (!strcmp(argv[2], "knob"))   {
+				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_KNOB, PX4_CUSTOM_SUB_MODE_KNOB_HEADING);
 
 			} else {
 				PX4_ERR("argument %s unsupported.", argv[2]);
@@ -612,8 +670,9 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 							break;
 
 						case PX4_CUSTOM_SUB_MODE_AUTO_TAKEOFF:
+							/* Edited by hcnam on 22.08.22. Add landed */
 							main_ret = main_state_transition(*status_local, commander_state_s::MAIN_STATE_AUTO_TAKEOFF, status_flags,
-											 &_internal_state);
+											 &_internal_state, _land_detector.landed);
 							break;
 
 						case PX4_CUSTOM_SUB_MODE_AUTO_LAND:
@@ -660,6 +719,17 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 
 					/* OFFBOARD */
 					main_ret = main_state_transition(*status_local, commander_state_s::MAIN_STATE_OFFBOARD, status_flags, &_internal_state);
+				} else if (custom_main_mode == PX4_CUSTOM_MAIN_MODE_KNOB) {
+					// /* KNOB */
+					// main_ret = main_state_transition(*status_local, commander_state_s::MAIN_STATE_KNOB, status_flags, &_internal_state);
+					switch(custom_sub_mode) {
+						case PX4_CUSTOM_SUB_MODE_KNOB_ROLL:
+							main_ret = main_state_transition(*status_local, commander_state_s::MAIN_STATE_KNOB_ROLL, status_flags, &_internal_state);
+							break;
+
+						case PX4_CUSTOM_SUB_MODE_KNOB_HEADING:
+							main_ret = main_state_transition(*status_local, commander_state_s::MAIN_STATE_KNOB_HEADING, status_flags, &_internal_state);
+					}
 				}
 
 			} else {
@@ -930,8 +1000,9 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 
 	case vehicle_command_s::VEHICLE_CMD_NAV_TAKEOFF: {
 			/* ok, home set, use it to take off */
+			/* Edited by hcnam on 22.08.22. Add landed flag */
 			if (TRANSITION_CHANGED == main_state_transition(*status_local, commander_state_s::MAIN_STATE_AUTO_TAKEOFF, status_flags,
-					&_internal_state)) {
+					&_internal_state, _land_detector.landed)) {
 				cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_ACCEPTED;
 
 			} else if (_internal_state.main_state == commander_state_s::MAIN_STATE_AUTO_TAKEOFF) {
@@ -1021,6 +1092,20 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 
 		break;
 
+	// Add knob mode 2020.03.10 nhc
+	case vehicle_command_s::VEHICLE_CMD_DO_KNOB: {
+
+		// if(TRANSITION_DENIED != main_state_transition(*status_local, commander_state_s::MAIN_STATE_KNOB, status_flags, &
+		// 		_internal_state)) {
+		// 	cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_ACCEPTED;
+		// } else {
+		// 	cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_TEMPORARILY_REJECTED;
+		// }
+
+		cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_ACCEPTED;
+	}
+	break;
+
 	case vehicle_command_s::VEHICLE_CMD_DO_MOTOR_TEST:
 		cmd_result = handle_command_motor_test(cmd);
 		break;
@@ -1101,6 +1186,7 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 	case vehicle_command_s::VEHICLE_CMD_DO_SET_ROI_LOCATION:
 	case vehicle_command_s::VEHICLE_CMD_DO_SET_ROI_WPNEXT_OFFSET:
 	case vehicle_command_s::VEHICLE_CMD_DO_SET_ROI_NONE:
+	case vehicle_command_s::VEHICLE_CMD_UPDATE_KNOB:
 		/* ignore commands that are handled by other parts of the system */
 		break;
 
@@ -1889,19 +1975,20 @@ Commander::run()
 			(_param_rc_override.get() & OVERRIDE_OFFBOARD_MODE_BIT) &&
 			_internal_state.main_state == commander_state_s::MAIN_STATE_OFFBOARD;
 
+		// disable this function on 21.06.01 by hcnam
 		if ((override_auto_mode || override_offboard_mode) && is_rotary_wing
 		    && !in_low_battery_failsafe && !_geofence_warning_action_on) {
-			// transition to previous state if sticks are touched
-			if ((_last_manual_control_setpoint.timestamp != _manual_control_setpoint.timestamp) &&
-			    ((fabsf(_manual_control_setpoint.x - _last_manual_control_setpoint.x) > _min_stick_change) ||
-			     (fabsf(_manual_control_setpoint.y - _last_manual_control_setpoint.y) > _min_stick_change) ||
-			     (fabsf(_manual_control_setpoint.z - _last_manual_control_setpoint.z) > _min_stick_change) ||
-			     (fabsf(_manual_control_setpoint.r - _last_manual_control_setpoint.r) > _min_stick_change))) {
+		// 	// transition to previous state if sticks are touched
+		// 	if ((_last_manual_control_setpoint.timestamp != _manual_control_setpoint.timestamp) &&
+		// 	    ((fabsf(_manual_control_setpoint.x - _last_manual_control_setpoint.x) > _min_stick_change) ||
+		// 	     (fabsf(_manual_control_setpoint.y - _last_manual_control_setpoint.y) > _min_stick_change) ||
+		// 	     (fabsf(_manual_control_setpoint.z - _last_manual_control_setpoint.z) > _min_stick_change) ||
+		// 	     (fabsf(_manual_control_setpoint.r - _last_manual_control_setpoint.r) > _min_stick_change))) {
 
-				// revert to position control in any case
-				main_state_transition(status, commander_state_s::MAIN_STATE_POSCTL, status_flags, &_internal_state);
-				mavlink_log_info(&mavlink_log_pub, "Pilot took over control using sticks");
-			}
+		// 		// revert to position control in any case
+		// 		main_state_transition(status, commander_state_s::MAIN_STATE_POSCTL, status_flags, &_internal_state);
+		// 		mavlink_log_info(&mavlink_log_pub, "Pilot took over control using sticks");
+		// 	}
 		}
 
 		/* Check for mission flight termination */
@@ -1946,8 +2033,9 @@ Commander::run()
 			status.rc_signal_lost = false;
 
 			const bool in_armed_state = (status.arming_state == vehicle_status_s::ARMING_STATE_ARMED);
-			const bool arm_switch_or_button_mapped =
-				_manual_control_setpoint.arm_switch != manual_control_setpoint_s::SWITCH_POS_NONE;
+			// const bool arm_switch_or_button_mapped =
+			// 	_manual_control_setpoint.arm_switch != manual_control_setpoint_s::SWITCH_POS_NONE;
+			const bool arm_switch_or_button_mapped = true; // added by hcnam on 21.09.06
 			const bool arm_button_pressed = _param_arm_switch_is_button.get()
 							&& (_manual_control_setpoint.arm_switch == manual_control_setpoint_s::SWITCH_POS_ON);
 
@@ -2838,7 +2926,8 @@ Commander::set_main_state_rc(const vehicle_status_s &status_local, bool *changed
 			res = TRANSITION_NOT_CHANGED;
 
 		} else {
-			res = main_state_transition(status_local, new_mode, status_flags, &_internal_state);
+			/* Edited by hcnam on 22.08.22. Add landed flag */
+			res = main_state_transition(status_local, new_mode, status_flags, &_internal_state, _land_detector.landed);
 
 			/* ensure that the mode selection does not get stuck here */
 			int maxcount = 5;
@@ -3341,6 +3430,14 @@ Commander::update_control_mode()
 		control_mode.flag_control_velocity_enabled = !status.in_transition_mode;
 		control_mode.flag_control_acceleration_enabled = false;
 		control_mode.flag_control_termination_enabled = false;
+		break;
+
+	case vehicle_status_s::NAVIGATION_STATE_KNOB_ROLL:
+	case vehicle_status_s::NAVIGATION_STATE_KNOB_HEADING:
+		control_mode.flag_control_rates_enabled = true;
+		control_mode.flag_control_attitude_enabled = true;
+		control_mode.flag_control_position_enabled = true;
+		control_mode.flag_control_velocity_enabled = true;
 		break;
 
 	default:
@@ -4137,6 +4234,10 @@ void Commander::estimator_check(const vehicle_status_flags_s &vstatus_flags)
 
 	/* run global position accuracy checks */
 	// Check if quality checking of position accuracy and consistency is to be performed
+
+	// added by hcnam on 21.06.17. _set _eph_threshold_adj to com_pos_fs_eph Parameter
+	_eph_threshold_adj = _param_com_pos_fs_eph.get();
+
 	if (run_quality_checks) {
 		if (_nav_test_failed) {
 			status_flags.condition_global_position_valid = false;
@@ -4265,6 +4366,9 @@ The commander module contains the state machine for mode switching and failsafe 
 			"Flight mode", false);
 	PRINT_MODULE_USAGE_COMMAND("lockdown");
 	PRINT_MODULE_USAGE_ARG("off", "Turn lockdown off", true);
+	/* added by hcnam in 21.05.03 */
+	PRINT_MODULE_USAGE_COMMAND_DESCR("knob_hdg|knob_roll", "Update Knob value");
+	PRINT_MODULE_USAGE_ARG("hdg_roll|altitude|velocity", "Command heading or roll, alttitude, velocity ", false);
 #endif
 	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
 

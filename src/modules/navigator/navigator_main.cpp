@@ -284,7 +284,9 @@ Navigator::run()
 
 					// Go on and check which changes had been requested
 					if (PX4_ISFINITE(cmd.param4)) {
-						rep->current.yaw = cmd.param4;
+						//edited by hcnam on 21.06.04
+						// rep->current.yaw = cmd.param4;
+						rep->current.yaw = cmd.param4 * M_PI_F / 180.0f;
 						rep->current.yaw_valid = true;
 
 					} else {

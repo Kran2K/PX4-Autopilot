@@ -91,8 +91,12 @@ enum class offboard_loss_rc_actions_t {
 };
 
 enum class position_nav_loss_actions_t {
-	ALTITUDE_MANUAL = 0,	// Altitude/Manual. Assume use of remote control after fallback. Switch to Altitude mode if a height estimate is available, else switch to MANUAL.
-	LAND_TERMINATE = 1,	// Land/Terminate.  Assume no use of remote control after fallback. Switch to Land mode if a height estimate is available, else switch to TERMINATION.
+	// ALTITUDE_MANUAL = 0,	// Altitude/Manual. Assume use of remote control after fallback. Switch to Altitude mode if a height estimate is available, else switch to MANUAL.
+	// LAND_TERMINATE = 1,	// Land/Terminate.  Assume no use of remote control after fallback. Switch to Land mode if a height estimate is available, else switch to TERMINATION.
+	DISABLED = 0,
+	MANUAL_ALTITUDE = 1,
+	MANUAL_ATTITUDE = 2,
+	AUTO_LAND = 3,
 };
 
 extern const char *const arming_state_names[];
@@ -120,9 +124,11 @@ arming_state_transition(vehicle_status_s *status, const safety_s &safety, const 
 			vehicle_status_flags_s *status_flags, const PreFlightCheck::arm_requirements_t &arm_requirements,
 			const hrt_abstime &time_since_boot, arm_disarm_reason_t calling_reason);
 
+/* Edited by hcnam on 22.08.22 */
+/* Add "bool landed" for checking landed when takeoff command was received */
 transition_result_t
 main_state_transition(const vehicle_status_s &status, const main_state_t new_main_state,
-		      const vehicle_status_flags_s &status_flags, commander_state_s *internal_state);
+		      const vehicle_status_flags_s &status_flags, commander_state_s *internal_state, bool landed = false);
 
 void enable_failsafe(vehicle_status_s *status, bool old_failsafe, orb_advert_t *mavlink_log_pub, const char *reason);
 
@@ -136,10 +142,12 @@ bool set_nav_state(vehicle_status_s *status, actuator_armed_s *armed, commander_
 /*
  * Checks the validty of position data against the requirements of the current navigation
  * mode and switches mode if position data required is not available.
+ * edited by hcnam on 21.06.17 const bool use_rc => const position_nav_loss_action_t nav_loss_act
  */
+// bool check_invalid_pos_nav_state(vehicle_status_s *status, bool old_failsafe, orb_advert_t *mavlink_log_pub,
+// 				 const vehicle_status_flags_s &status_flags, const bool use_rc, const bool using_global_pos);
 bool check_invalid_pos_nav_state(vehicle_status_s *status, bool old_failsafe, orb_advert_t *mavlink_log_pub,
-				 const vehicle_status_flags_s &status_flags, const bool use_rc, const bool using_global_pos);
-
+				 const vehicle_status_flags_s &status_flags, const position_nav_loss_actions_t nav_loss_act, const bool using_global_pos);
 
 // COM_LOW_BAT_ACT parameter values
 typedef enum LOW_BAT_ACTION {

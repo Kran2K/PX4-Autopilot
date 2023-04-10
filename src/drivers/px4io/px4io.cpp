@@ -1959,8 +1959,12 @@ PX4IO::io_publish_pwm_outputs()
 		outputs.output[i] = ctl[i];
 	}
 
-	_to_outputs.publish(outputs);
-
+	//djlee need to check airframe
+	int param_val;
+	param_get(param_find("SYS_AUTOSTART"), &param_val);
+	if (param_val != 1001){
+		_to_outputs.publish(outputs);
+	}
 	/* get mixer status flags from IO */
 	MultirotorMixer::saturation_status saturation_status;
 	ret = io_reg_get(PX4IO_PAGE_STATUS, PX4IO_P_STATUS_MIXER, &saturation_status.value, 1);

@@ -43,7 +43,12 @@ uint8 NAVIGATION_STATE_AUTO_LAND = 18		# Land
 uint8 NAVIGATION_STATE_AUTO_FOLLOW_TARGET = 19	# Auto Follow
 uint8 NAVIGATION_STATE_AUTO_PRECLAND = 20	# Precision land with landing target
 uint8 NAVIGATION_STATE_ORBIT = 21       # Orbit in a circle
-uint8 NAVIGATION_STATE_MAX = 22
+# uint8 NAVIGATION_STATE_KNOB = 22                # Knob mode // 2020.03.10 nhc
+# uint8 NAVIGATION_STATE_MAX = 23                 # change value 22 to 23 // 2020.03.10 nhc
+uint8 NAVIGATION_STATE_KNOB_ROLL = 22             # Knob mode_roll // 2020.06.22 nhc
+uint8 NAVIGATION_STATE_KNOB_HEADING = 23          # Knob mode_heading // 2021.06.22 nhc
+uint8 NAVIGATION_STATE_RATE = 24
+uint8 NAVIGATION_STATE_MAX = 25                 # change value 22 to 23 // 2020.03.10 nhc
 
 uint8 RC_IN_MODE_DEFAULT = 0
 uint8 RC_IN_MODE_OFF = 1

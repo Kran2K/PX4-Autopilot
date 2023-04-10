@@ -425,9 +425,11 @@ bool MixingOutput::update()
 	return true;
 }
 
+
 void
 MixingOutput::setAndPublishActuatorOutputs(unsigned num_outputs, actuator_outputs_s &actuator_outputs)
 {
+
 	actuator_outputs.noutputs = num_outputs;
 
 	for (size_t i = 0; i < num_outputs; ++i) {
@@ -435,7 +437,13 @@ MixingOutput::setAndPublishActuatorOutputs(unsigned num_outputs, actuator_output
 	}
 
 	actuator_outputs.timestamp = hrt_absolute_time();
-	_outputs_pub.publish(actuator_outputs);
+
+	// djlee : need to check airframe
+	int param_val;
+	param_get(param_find("SYS_AUTOSTART"), &param_val);
+	if (param_val != 1001){
+		_outputs_pub.publish(actuator_outputs);
+	}
 }
 
 void

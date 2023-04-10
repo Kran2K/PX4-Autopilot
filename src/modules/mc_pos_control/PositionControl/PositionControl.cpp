@@ -146,6 +146,10 @@ void PositionControl::_velocityControl(const float dt)
 	// PID velocity control
 	Vector3f vel_error = _vel_sp - _vel;
 	Vector3f acc_sp_velocity = vel_error.emult(_gain_vel_p) + _vel_int - _vel_dot.emult(_gain_vel_d);
+	// PX4_INFO("dt: %lf, vel: %lf, vel_sp: %lf", (double)dt, (double)_vel(2), (double)_vel_sp(2));
+	// PX4_INFO("vel_err: %lf, _vel_int: %lf, _vel_dot: %lf", (double)vel_error.emult(_gain_vel_p)(2,0), (double)_vel_int(2), (double)_vel_dot.emult(_gain_vel_d)(2,0));
+	// PX4_INFO("acc_sp_velocity: %lf",(double)acc_sp_velocity(2));
+	// PX4_INFO("");
 
 	// No control input from setpoints or corresponding states which are NAN
 	ControlMath::addIfNotNanVector3f(_acc_sp, acc_sp_velocity);

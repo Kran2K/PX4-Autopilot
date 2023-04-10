@@ -51,4 +51,6 @@ px4_add_romfs_files(
 	rc.vehicle_setup
 	rc.vtol_apps
 	rc.vtol_defaults
+	#21.05.17 added by hcnam
+	rc.vrdrone_defaults
 )

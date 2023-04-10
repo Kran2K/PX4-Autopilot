@@ -428,12 +428,16 @@ void task_main(int argc, char *argv[])
 		}
 
 		_outputs.timestamp = hrt_absolute_time();
+		//djlee need to check airframe
+		int param_val;
+		param_get(param_find("SYS_AUTOSTART"), &param_val);
+		if (param_val != 1001){
+			if (_outputs_pub != nullptr) {
+				orb_publish(ORB_ID(actuator_outputs), _outputs_pub, &_outputs);
 
-		if (_outputs_pub != nullptr) {
-			orb_publish(ORB_ID(actuator_outputs), _outputs_pub, &_outputs);
-
-		} else {
-			_outputs_pub = orb_advertise(ORB_ID(actuator_outputs), &_outputs);
+			} else {
+				_outputs_pub = orb_advertise(ORB_ID(actuator_outputs), &_outputs);
+			}
 		}
 
 		// use first valid timestamp_sample for latency tracking

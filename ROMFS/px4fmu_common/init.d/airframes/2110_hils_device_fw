@@ -1,0 +1,47 @@
+#!/bin/sh
+# 2020-03-26 nhc
+#
+# @name Shinil HILS FW airframe
+#
+# @type Standard Plane
+# @class Plane
+#
+# @output AUX1 throttle
+# @output AUX2 left aileron
+# @output AUX3 left flap
+# @output AUX4 right flag
+# @output AUX5 right aileron
+# @output AUX6 rudder
+# @output AUX7 elevator
+#
+#
+
+sh /etc/init.d/rc.fw_defaults
+sh /etc/init.d/rc.vrdrone_defaults
+
+param set FW_AIRSPD_MIN 10
+param set FW_AIRSPD_TRIM 15
+param set FW_AIRSPD_MAX 20
+
+param set FW_MAN_P_MAX 25
+param set FW_MAN_R_MAX 25
+param set FW_R_LIM 55
+
+param set FW_WR_FF 0.2
+param set FW_WR_I 0.2
+param set FW_WR_IMAX 0.8
+param set FW_WR_P 1
+param set FW_W_RMAX 0
+
+param set RWTO_TKOFF 1
+
+# set disarmed value for the ESC
+param set PWM_DISARMED 1000
+
+param set BAT1_N_CELLS 5
+
+set MIXER HIL_device
+set MIXER_AUX HIL_device
+
+# use PWM parameters for throttle channel
+# set PWM_AUX_OUT 1

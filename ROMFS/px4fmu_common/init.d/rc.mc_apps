@@ -40,7 +40,7 @@ else
 		# EKF2
 		#
 		param set SYS_MC_EST_GROUP 2
-		ekf2 start
+		ekf2 start &
 	fi
 fi
 
@@ -48,21 +48,32 @@ fi
 #                        End Estimator Group Selection                        #
 ###############################################################################
 
-#
-# Start Multicopter Rate Controller.
-#
-mc_rate_control start
+# #
+# # Start Multicopter Rate Controller.
+# #
+# mc_rate_control start
 
-#
-# Start Multicopter Attitude Controller.
-#
-mc_att_control start
+# #
+# # Start Multicopter Attitude Controller.
+# #
+# mc_att_control start
 
-#
-# Start Multicopter Position Controller.
-#
-mc_hover_thrust_estimator start
-mc_pos_control start
+# #
+# # Start Multicopter Position Controller.
+# #
+# mc_hover_thrust_estimator start
+# mc_pos_control start
+# sr_controllaw start
+
+echo "Board defaults: ${param compare SYS_AUTOSTART 1001}"
+	if param compare SYS_AUTOSTART 1001
+	then
+		sr_controllaw start
+	else
+		mc_rate_control start
+		mc_att_control start
+		mc_pos_control start
+	fi
 
 #
 # Start Multicopter Land Detector.

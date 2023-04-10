@@ -71,7 +71,8 @@ bool PreFlightCheck::airspeedCheck(orb_advert_t *mavlink_log_pub, vehicle_status
 	 */
 	if (prearm && fabsf(airspeed.confidence) < 0.95f) {
 		if (report_fail) {
-			mavlink_log_critical(mavlink_log_pub, "Preflight Fail: Airspeed Sensor stuck");
+			//commented out message about Airspeed on 21.05.27
+			// mavlink_log_critical(mavlink_log_pub, "Preflight Fail: Airspeed Sensor stuck");
 		}
 
 		present = true;

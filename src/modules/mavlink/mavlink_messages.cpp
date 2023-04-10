@@ -258,6 +258,16 @@ void get_mavlink_navigation_mode(const struct vehicle_status_s *const status, ui
 		custom_mode->main_mode = PX4_CUSTOM_MAIN_MODE_OFFBOARD;
 		break;
 
+	case vehicle_status_s::NAVIGATION_STATE_KNOB_ROLL:
+		custom_mode->main_mode = PX4_CUSTOM_MAIN_MODE_KNOB;
+		custom_mode->sub_mode = PX4_CUSTOM_SUB_MODE_KNOB_ROLL;
+		break;
+
+	case vehicle_status_s::NAVIGATION_STATE_KNOB_HEADING:
+		custom_mode->main_mode = PX4_CUSTOM_MAIN_MODE_KNOB;
+		custom_mode->sub_mode = PX4_CUSTOM_SUB_MODE_KNOB_HEADING;
+		break;
+
 	case vehicle_status_s::NAVIGATION_STATE_MAX:
 		/* this is an unused case, ignore */
 		break;
@@ -410,7 +420,9 @@ protected:
 
 	bool send(const hrt_abstime t) override
 	{
-		if (!_mavlink->get_logbuffer()->empty() && _mavlink->is_connected()) {
+		// if (!_mavlink->get_logbuffer()->empty() && _mavlink->is_connected()) {
+		//except _mavlink->is_connected() condition for Uplink loss. edited by hcnam on 21.06.17
+		if (!_mavlink->get_logbuffer()->empty()) {
 
 			mavlink_log_s mavlink_log{};
 
@@ -1550,6 +1562,9 @@ protected:
 				msg.throttle = 100 * math::max(
 						       act0.control[actuator_controls_s::INDEX_THROTTLE],
 						       act1.control[actuator_controls_s::INDEX_THROTTLE]);
+
+				/* added by hcnam on 21.10.13 */
+				msg.throttle = msg.throttle > 100 ? 100 : msg.throttle;
 
 			} else {
 				msg.throttle = 0.0f;
@@ -3294,11 +3309,14 @@ public:
 
 private:
 	uORB::Subscription _status_sub{ORB_ID(vehicle_status)};
-	uORB::Subscription _act_sub{ORB_ID(actuator_outputs)};
+	//djlee using second instance of actuator_outputs to use cube black fcc.
+	uORB::Subscription _act_sub{ORB_ID(actuator_outputs), 1};
 
 	/* do not allow top copying this class */
 	MavlinkStreamHILActuatorControls(MavlinkStreamHILActuatorControls &) = delete;
 	MavlinkStreamHILActuatorControls &operator = (const MavlinkStreamHILActuatorControls &) = delete;
+
+
 
 protected:
 	explicit MavlinkStreamHILActuatorControls(Mavlink *mavlink) : MavlinkStream(mavlink)
@@ -3308,11 +3326,18 @@ protected:
 	{
 		actuator_outputs_s act;
 
+		//230102 djlee : added to check airframe parameters when sending HIL_ACTUATOR_CONTROLS.
+		int param_val;
+		param_get(param_find("SYS_AUTOSTART"), &param_val);
+
+		_act_sub.get_instance();
 		if (_act_sub.update(&act)) {
 			vehicle_status_s status{};
 			_status_sub.copy(&status);
 
-			if ((status.timestamp > 0) && (status.arming_state == vehicle_status_s::ARMING_STATE_ARMED)) {
+			// comment out on 21.05.27 by hcnam
+			// if ((status.timestamp > 0) && (status.arming_state == vehicle_status_s::ARMING_STATE_ARMED)) {
+			if ((status.timestamp > 0)) {
 				/* translate the current system state to mavlink state and mode */
 				uint8_t mavlink_state;
 				uint8_t mavlink_base_mode;
@@ -3363,29 +3388,53 @@ protected:
 						break;
 					}
 
-					for (unsigned i = 0; i < 16; i++) {
-						if (act.output[i] > PWM_DEFAULT_MIN / 2) {
-							if (i < n) {
-								/* scale PWM out 900..2100 us to 0..1 for rotors */
-								msg.controls[i] = (act.output[i] - PWM_DEFAULT_MIN) / (PWM_DEFAULT_MAX - PWM_DEFAULT_MIN);
 
+
+					if(param_val == 1001){
+						// 221026 djlee - to fit actuator output value with synchropter
+						for (unsigned i = 0; i < 16; i++) {
+							if (i < 4) {
+
+								// act.output[0] = math::max(-1.0f, math::min(11.0f, act.output[0]));
+								// act.output[1] = math::max(-6.0f, math::min(6.0f, act.output[1]));
+								// act.output[2] = math::max(-6.0f, math::min(6.0f, act.output[2]));
+								// act.output[3] = math::max(-6.0f, math::min(6.0f, act.output[3]));
+								/* scale PWM out 901..2100 us to 0..1 for rotors */
+								msg.controls[i] = act.output[i];
+								// PX4_INFO("%8f %8f %8f %8f", msg.controls[0], msg.controls[1], msg.controls[2],msg.controls[3]);
 							} else {
-								/* scale PWM out 900..2100 us to -1..1 for other channels */
-								msg.controls[i] = (act.output[i] - pwm_center) / ((PWM_DEFAULT_MAX - PWM_DEFAULT_MIN) / 2);
+								msg.controls[i] = act.output[i];
 							}
 
-						} else {
-							/* send 0 when disarmed and for disabled channels */
-							msg.controls[i] = 0.0f;
 						}
 					}
+					else{
+						for (unsigned i = 0; i < 16; i++) {
+							if (act.output[i] > PWM_DEFAULT_MIN / 2) {
+								if (i < n) {
+									/* scale PWM out 900..2100 us to 0..1 for rotors */
+									msg.controls[i] = (act.output[i] - PWM_DEFAULT_MIN) / (PWM_DEFAULT_MAX - PWM_DEFAULT_MIN);
+
+								} else {
+									/* scale PWM out 900..2100 us to -1..1 for other channels */
+									msg.controls[i] = (act.output[i] - pwm_center) / ((PWM_DEFAULT_MAX - PWM_DEFAULT_MIN) / 2);
+								}
+
+							} else {
+								/* send 0 when disarmed and for disabled channels */
+								msg.controls[i] = 0.0f;
+							}
+						}
+					}
+
 
 				} else {
 					/* fixed wing: scale throttle to 0..1 and other channels to -1..1 */
 
 					for (unsigned i = 0; i < 16; i++) {
 						if (act.output[i] > PWM_DEFAULT_MIN / 2) {
-							if (i != 3) {
+							// edited by hcnam on 21.06.07 throttle index is 0
+							if (i != 0) {
 								/* scale PWM out 900..2100 us to -1..1 for normal channels */
 								msg.controls[i] = (act.output[i] - pwm_center) / ((PWM_DEFAULT_MAX - PWM_DEFAULT_MIN) / 2);
 

@@ -263,10 +263,11 @@ else
 	#
 	# If autoconfig parameter was set, reset it and save parameters.
 	#
-	if [ $AUTOCNF = yes ]
-	then
-		param set SYS_AUTOCONFIG 0
-	fi
+	# comment by hcnam on 21.05.12
+	#if [ $AUTOCNF = yes ]
+	#then
+	#	param set SYS_AUTOCONFIG 0
+	#fi
 
 	#
 	# Check if PX4IO present and update firmware if needed.

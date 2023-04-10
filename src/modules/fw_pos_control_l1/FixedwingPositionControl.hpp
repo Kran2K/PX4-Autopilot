@@ -266,8 +266,16 @@ private:
 		FW_POSCTRL_MODE_AUTO,
 		FW_POSCTRL_MODE_POSITION,
 		FW_POSCTRL_MODE_ALTITUDE,
-		FW_POSCTRL_MODE_OTHER
+		FW_POSCTRL_MODE_OTHER,
+		FW_POSCTRL_MODE_KNOB
 	} _control_mode_current{FW_POSCTRL_MODE_OTHER};		///< used to check the mode in the last control loop iteration. Use to check if the last iteration was in the same mode.
+
+	/* For Knob mode 2020.03.12 hcnam */
+	float _knob_hdg{0.0f};
+	float _knob_roll{0.0f};
+	float _knob_alt{0.0f};
+	float _knob_vel{0.0f};
+	bool _knob_flag_roll; // true : roll false : heading
 
 	param_t _param_handle_airspeed_trans{PARAM_INVALID};
 	float _param_airspeed_trans{NAN};

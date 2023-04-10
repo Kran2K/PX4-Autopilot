@@ -766,3 +766,23 @@ PARAM_DEFINE_FLOAT(MPC_SPOOLUP_TIME, 1.0f);
  * @group Mission
  */
 PARAM_DEFINE_INT32(MPC_YAW_MODE, 0);
+
+/**
+ * vertical descent velocity
+ *
+ * 2020.04.06 nhc
+ *
+ * @unit m/s
+ * @group Multicopter Position Control
+ */
+PARAM_DEFINE_FLOAT(MPC_Z_VEL_DN, 1.0f);
+
+/**
+ * vertical ascent velocity
+ *
+ * 2020.04.06 nhc
+ *
+ * @unit m/s
+ * @group Multicopter Position Control
+ */
+PARAM_DEFINE_FLOAT(MPC_Z_VEL_UP, 1.0f);

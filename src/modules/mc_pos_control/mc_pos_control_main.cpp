@@ -902,6 +902,26 @@ MulticopterPositionControl::start_flight_task()
 		should_disable_task = false;
 	}
 
+	if (_vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_KNOB_ROLL ||
+	_vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_KNOB_HEADING) {
+		should_disable_task = false;
+		FlightTaskError error = FlightTaskError::NoError;
+
+		error = _flight_tasks.switchTask(FlightTaskIndex::Knob);
+
+		if (error != FlightTaskError::NoError) {
+			if(prev_failure_count == 0) {
+				PX4_WARN("Knob mode activation failed with error: %s", _flight_tasks.errorToString(error));
+			}
+
+			task_failure = true;
+			_task_failure_count++;
+		} else {
+			// check_failure(task_failure, vehicle_status_s::NAVIGATION_STATE_KNOB); comment it on 21.06.22 by hcnam
+			task_failure = false;
+		}
+	}
+
 	// check task failure
 	if (task_failure) {
 

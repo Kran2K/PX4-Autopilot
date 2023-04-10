@@ -103,6 +103,13 @@
 #include <uORB/topics/vehicle_trajectory_bezier.h>
 #include <uORB/topics/vehicle_trajectory_waypoint.h>
 
+//added by hcnam on 21.05.14
+#include <uORB/topics/vehicle_air_data.h>
+#include <uORB/topics/vehicle_acceleration.h>
+#include <uORB/topics/vehicle_angular_velocity.h>
+#include <uORB/topics/vehicle_magnetometer.h>
+#include <uORB/topics/airspeed_validated.h>
+
 class Mavlink;
 
 class MavlinkReceiver : public ModuleParams
@@ -180,6 +187,8 @@ private:
 	void handle_message_vision_position_estimate(mavlink_message_t *msg);
 	void handle_message_onboard_computer_status(mavlink_message_t *msg);
 
+	/* added by hcnam on 21.05.12 */
+	void handle_message_encapsulated_data(mavlink_message_t *msg);
 
 	void Run();
 
@@ -261,6 +270,13 @@ private:
 	uORB::Publication<vehicle_trajectory_bezier_s>	_trajectory_bezier_pub{ORB_ID(vehicle_trajectory_bezier)};
 	uORB::Publication<vehicle_trajectory_waypoint_s>	_trajectory_waypoint_pub{ORB_ID(vehicle_trajectory_waypoint)};
 
+	// added by hcnam on 21.05.14
+	uORB::Publication<vehicle_air_data_s>			_air_data_pub{ORB_ID(vehicle_air_data)};
+	uORB::Publication<vehicle_angular_velocity_s>		_angular_velocity_pub{ORB_ID(vehicle_angular_velocity)};
+	uORB::Publication<vehicle_acceleration_s>		_aceeleration_pub{ORB_ID(vehicle_acceleration)};
+	uORB::Publication<vehicle_magnetometer_s>		_magnetometer_pub{ORB_ID(vehicle_magnetometer)};
+	uORB::Publication<airspeed_validated_s>			_airspeed_validated_pub{ORB_ID(airspeed_validated)};
+
 	// ORB publications (multi)
 	uORB::PublicationMulti<distance_sensor_s>		_distance_sensor_pub{ORB_ID(distance_sensor), ORB_PRIO_LOW};
 	uORB::PublicationMulti<distance_sensor_s>		_flow_distance_sensor_pub{ORB_ID(distance_sensor), ORB_PRIO_LOW};
@@ -306,6 +322,12 @@ private:
 	float				_hil_local_alt0{0.0f};
 	bool				_hil_local_proj_inited{false};
 
+	//added by hcnam on 21.05.12
+	uint64_t _hil_ref_timestamp{0};
+	double _hil_ref_lat{0};
+	double _hil_ref_lon{0};
+	float _hil_ref_alt{0.0f};
+
 	hrt_abstime			_last_utm_global_pos_com{0};
 
 	// Allocated if needed.
@@ -319,7 +341,10 @@ private:
 		(ParamFloat<px4::params::SENS_FLOW_MAXHGT>) _param_sens_flow_maxhgt,
 		(ParamFloat<px4::params::SENS_FLOW_MAXR>)   _param_sens_flow_maxr,
 		(ParamFloat<px4::params::SENS_FLOW_MINHGT>) _param_sens_flow_minhgt,
-		(ParamInt<px4::params::SENS_FLOW_ROT>)      _param_sens_flow_rot
+		(ParamInt<px4::params::SENS_FLOW_ROT>)      _param_sens_flow_rot,
+		(ParamInt<px4::params::BAT1_N_CELLS>)	    _param_bat1_n_cells,
+		(ParamFloat<px4::params::BAT1_V_CHARGED>)   _param_bat1_v_charged,
+		(ParamFloat<px4::params::BAT1_V_EMPTY>)	    _param_bat1_v_empty
 	);
 
 	// Disallow copy construction and move assignment.

@@ -584,7 +584,12 @@ void TAP_ESC::cycle()
 		}
 
 		/* and publish for anyone that cares to see */
-		orb_publish(ORB_ID(actuator_outputs), _outputs_pub, &_outputs);
+		//djlee : need to check airframe
+		int param_val;
+		param_get(param_find("SYS_AUTOSTART"), &param_val);
+		if (param_val != 1001){
+			orb_publish(ORB_ID(actuator_outputs), _outputs_pub, &_outputs);
+		}
 
 		// use first valid timestamp_sample for latency tracking
 		for (int i = 0; i < actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS; i++) {

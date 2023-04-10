@@ -79,6 +79,7 @@ px4_add_board(
 		rc_update
 		rover_pos_control
 		sensors
+		sr_controllaw
 		sih
 		temperature_compensation
 		vmount
