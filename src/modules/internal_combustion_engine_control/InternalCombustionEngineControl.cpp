@@ -33,6 +33,8 @@
 
 #include "InternalCombustionEngineControl.hpp"
 
+#include <px4_platform_common/events.h>
+
 using namespace time_literals;
 
 namespace internal_combustion_engine_control
@@ -179,7 +181,9 @@ void InternalCombustionEngineControl::Run()
 
 							if (maximumAttemptsReached()) {
 								_state = State::Fault;
-								PX4_WARN("ICE: Fault");
+								PX4_WARN("ICE: Fault detected, maximum starting attempts reached");
+								events::send(events::ID("internal_combustion_engine_control_maximum_attempts_reached"), events::Log::Critical,
+									     "ICE: Fault detected, maximum starting attempts reached");
 
 							} else if (!isStartingPermitted(now)) {
 								controlEngineStop();
@@ -210,7 +214,9 @@ void InternalCombustionEngineControl::Run()
 				_state = State::Starting;
 				_state_start_time = now;
 				_starting_retry_cycle = 0;
-				PX4_WARN("ICE: Running Fault detected");
+				PX4_WARN("ICE: telemetry missing");
+				events::send(events::ID("internal_combustion_engine_control_telemetry_missing"), events::Log::Critical,
+					     "ICE: telemetry missing");
 			}
 		}
 
