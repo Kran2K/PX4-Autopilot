@@ -927,6 +927,37 @@ FixedwingPositionControl::control_position(const hrt_abstime &now, const Vector2
 		_att_sp.roll_body = _manual_control_setpoint.y * radians(_param_fw_man_r_max.get());
 		_att_sp.yaw_body = 0;
 
+	} else if (_control_mode.flag_control_position_enabled && _control_mode.flag_control_velocity_enabled) {
+		/* Knob Mode - 2020.03.12 nhc*/
+		// PX4_INFO("%s : %f, Altitude : %f, Velocity : %f", (_knob_flag_roll ? "Roll" : "Heading"),
+		// 						(_knob_flag_roll ? (double)_knob_roll : (double)_knob_hdg),
+		// 						(double)_knob_alt, (double)_knob_vel);
+
+		_control_mode_current = FW_POSCTRL_MODE_KNOB;
+		_att_sp.fw_control_yaw = true;
+
+		if(_knob_flag_roll) {
+			 _att_sp.roll_body = radians(_knob_roll);
+		} else {
+			_l1_control.navigate_heading(radians(_knob_hdg), _yaw, ground_speed);
+			_att_sp.yaw_body = _l1_control.nav_bearing();
+			_att_sp.roll_body = _l1_control.get_roll_setpoint();
+			// _att_sp.roll_body = 0.0f;
+		}
+
+		tecs_update_pitch_throttle(now, _knob_alt,
+					  calculate_target_airspeed(_knob_vel, ground_speed),
+					//   _knob_vel,
+					   radians(_param_fw_p_lim_min.get()),
+					   radians(_param_fw_p_lim_max.get()),
+					  _param_fw_thr_min.get(),
+					  _param_fw_thr_max.get(),
+					  _param_fw_thr_cruise.get(),
+					  false,
+					   radians(_param_fw_p_lim_min.get()));
+
+		// PX4_INFO("thrust: %f", (double)get_tecs_thrust());
+
 	} else {
 		_control_mode_current = FW_POSCTRL_MODE_OTHER;
 
@@ -1482,6 +1513,21 @@ FixedwingPositionControl::handle_command()
 			abort_landing(true);
 		}
 	}
+
+	else if(_vehicle_command.command == vehicle_command_s::VEHICLE_CMD_DO_KNOB ||
+		_vehicle_command.command == vehicle_command_s::VEHICLE_CMD_UPDATE_KNOB) {
+			if(_vehicle_command.param7 < 0.0f) {
+				_knob_flag_roll = true;
+				_knob_roll = _vehicle_command.param1;
+				_knob_hdg = NAN;
+			} else {
+				_knob_flag_roll = false;
+				_knob_hdg = _vehicle_command.param1;
+				_knob_roll = NAN;
+			}
+			_knob_alt = _vehicle_command.param2;
+			_knob_vel = _vehicle_command.param3;
+		}
 }
 
 void

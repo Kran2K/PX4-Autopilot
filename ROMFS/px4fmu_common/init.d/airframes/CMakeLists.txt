@@ -44,6 +44,7 @@ px4_add_romfs_files(
 	2100_standard_plane
 	2105_maja
 	2106_albatross
+	2110_hils_device_fw
 	2200_mini_talon
 
 	# [3000, 3999] Flying wing"
@@ -84,6 +85,7 @@ px4_add_romfs_files(
 	4080_zmr250
 	4090_nanomind
 	4100_tiltquadrotor
+	4110_hils_device_mc
 	4250_teal
 	4500_clover4
 	4900_crazyflie

@@ -769,6 +769,13 @@ void Ekf2::Run()
 	hrt_abstime imu_dt = 0; // for tracking time slip later
 	estimator_sensor_bias_s bias{};
 
+	// added by hcnam on 21.06.21
+	// _imu_sub_index initialize on EKF2 module first run
+	// in that time, IG is booting or in pause state, so index initialized to -1
+	// for that reason, index value setting by force.
+	if(_vehicle_imu_subs[0].updated())
+		_imu_sub_index = 0;
+
 	if (_imu_sub_index >= 0) {
 		vehicle_imu_s imu;
 		updated = _vehicle_imu_subs[_imu_sub_index].update(&imu);

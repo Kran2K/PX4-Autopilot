@@ -31,26 +31,9 @@
 #
 ############################################################################
 
-add_subdirectory(airframes)
-
-px4_add_romfs_files(
-	rc.fw_apps
-	rc.fw_defaults
-	rc.interface
-	rc.io
-	rc.logging
-	rc.mc_apps
-	rc.mc_defaults
-	rcS
-	rc.sensors
-	rc.thermal_cal
-	rc.rover_apps
-	rc.rover_defaults
-	rc.uuv_apps
-	rc.uuv_defaults
-	rc.vehicle_setup
-	rc.vtol_apps
-	rc.vtol_defaults
-	#21.05.17 added by hcnam
-	rc.vrdrone_defaults
+px4_add_library(FlightTaskKnob
+	FlightTaskKnob.cpp
 )
+
+target_link_libraries(FlightTaskKnob PUBLIC FlightTask)
+target_include_directories(FlightTaskKnob PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

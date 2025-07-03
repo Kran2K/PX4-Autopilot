@@ -1,0 +1,18 @@
+#!/bin/sh
+#
+# VR Drone default parameters.
+#
+# NOTE: Script variables are declared/initialized/unset in the rcS script.
+# Added by hcnam on 21.05.17
+
+param set SYS_HITL 1
+param set MAV_PROTO_VER 2
+param set RTL_TYPE 0
+param set MIS_DIST_1WP 0
+param set MIS_DIST_WPS 0
+param set SYS_AUTOCONFIG 1
+param set COM_DISARM_LAND 0
+param set COM_DISARM_PRFLT 0
+param set COM_LOW_BAT_ACT 1
+param set NAV_DLL_ACT 2
+param set COM_POSCTL_NAVL 1

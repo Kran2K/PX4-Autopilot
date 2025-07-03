@@ -1,0 +1,46 @@
+#!/bin/sh
+# 2020-05-27 nhc
+#
+# @name Shinil HILS MC airframe
+#
+# @type Quadrotor x
+# @class Copter
+#
+#
+# @output MAIN1 motor 1
+# @output MAIN2 motor 2
+# @output MAIN3 motor 3
+# @output MAIN4 motor 4
+#
+#
+
+sh /etc/init.d/rc.mc_defaults
+sh /etc/init.d/rc.vrdrone_defaults
+
+param set MPC_Z_VEL_MAX_UP 7.0
+param set MPC_Z_VEL_MAX_DN 4.0
+param set MPC_TILTMAX_AIR 25
+param set MPC_THR_MAX 3.0
+
+param set MPC_Z_MAN_EXPO 0
+
+param set MPC_THR_HOVER 0.6
+param set MC_PITCH_P 3.25
+param set MC_ROLL_P 3.25
+param set MC_YAW_P 1.4
+
+param set MC_YAWRATE_D 0.0
+param set MC_YAWRATE_I 0.1
+param set MC_YAWRATE_P 1.0
+param set MC_YAWRATE_MAX 150
+
+param set MPC_VEL_MANUAL 7.0
+
+param set RTL_LAND_DELAY 0
+param set MPC_LAND_SPEED 4.0
+param set RTL_CONE_ANG 0
+
+param set BAT1_N_CELLS 6
+
+set MIXER quad_x
+set PWM_OUT 1234

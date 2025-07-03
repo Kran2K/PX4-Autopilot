@@ -220,8 +220,9 @@ AirspeedModule::init()
 		_valid_airspeed_index = math::min(_param_airspeed_primary_index.get(), _number_of_airspeed_sensors);
 
 		if (_number_of_airspeed_sensors == 0) {
-			mavlink_log_info(&_mavlink_log_pub,
-					 "No airspeed sensor detected. Switch to non-airspeed mode.");
+			// commented out message about airspeed on 21.05.27
+			// mavlink_log_info(&_mavlink_log_pub,
+			// 		 "No airspeed sensor detected. Switch to non-airspeed mode.");
 
 		} else {
 			mavlink_log_info(&_mavlink_log_pub,
@@ -526,8 +527,9 @@ void AirspeedModule::select_airspeed_and_publish()
 	/* Suppress log message if still on the ground and no airspeed sensor connected */
 	if (_valid_airspeed_index != _prev_airspeed_index && (_number_of_airspeed_sensors > 0
 			|| !_vehicle_land_detected.landed)) {
-		mavlink_log_critical(&_mavlink_log_pub, "Airspeed: switched from sensor %i to %i", _prev_airspeed_index,
-				     _valid_airspeed_index);
+		//commentec out message about airspeed on 21.05.27
+		// mavlink_log_critical(&_mavlink_log_pub, "Airspeed: switched from sensor %i to %i", _prev_airspeed_index,
+		// 		     _valid_airspeed_index);
 	}
 
 	_prev_airspeed_index = _valid_airspeed_index;

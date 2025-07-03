@@ -653,6 +653,7 @@ MavlinkMissionManager::handle_mission_set_current(const mavlink_message_t *msg)
 			if (wpc.seq < _count[MAV_MISSION_TYPE_MISSION]) {
 				if (update_active_mission(_dataman_id, _count[MAV_MISSION_TYPE_MISSION], wpc.seq) == PX4_OK) {
 					PX4_DEBUG("WPM: MISSION_SET_CURRENT seq=%d OK", wpc.seq);
+					PX4_INFO("WPM: MISSION_SET_CURRENT seq=%d OK", wpc.seq);
 
 				} else {
 					PX4_DEBUG("WPM: MISSION_SET_CURRENT seq=%d ERROR", wpc.seq);

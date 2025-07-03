@@ -258,6 +258,16 @@ void get_mavlink_navigation_mode(const struct vehicle_status_s *const status, ui
 		custom_mode->main_mode = PX4_CUSTOM_MAIN_MODE_OFFBOARD;
 		break;
 
+	case vehicle_status_s::NAVIGATION_STATE_KNOB_ROLL:
+		custom_mode->main_mode = PX4_CUSTOM_MAIN_MODE_KNOB;
+		custom_mode->sub_mode = PX4_CUSTOM_SUB_MODE_KNOB_ROLL;
+		break;
+
+	case vehicle_status_s::NAVIGATION_STATE_KNOB_HEADING:
+		custom_mode->main_mode = PX4_CUSTOM_MAIN_MODE_KNOB;
+		custom_mode->sub_mode = PX4_CUSTOM_SUB_MODE_KNOB_HEADING;
+		break;
+
 	case vehicle_status_s::NAVIGATION_STATE_MAX:
 		/* this is an unused case, ignore */
 		break;
@@ -410,7 +420,9 @@ protected:
 
 	bool send(const hrt_abstime t) override
 	{
-		if (!_mavlink->get_logbuffer()->empty() && _mavlink->is_connected()) {
+		// if (!_mavlink->get_logbuffer()->empty() && _mavlink->is_connected()) {
+		//except _mavlink->is_connected() condition for Uplink loss. edited by hcnam on 21.06.17
+		if (!_mavlink->get_logbuffer()->empty()) {
 
 			mavlink_log_s mavlink_log{};
 
@@ -1550,6 +1562,9 @@ protected:
 				msg.throttle = 100 * math::max(
 						       act0.control[actuator_controls_s::INDEX_THROTTLE],
 						       act1.control[actuator_controls_s::INDEX_THROTTLE]);
+
+				/* added by hcnam on 21.10.13 */
+				msg.throttle = msg.throttle > 100 ? 100 : msg.throttle;
 
 			} else {
 				msg.throttle = 0.0f;
@@ -3312,7 +3327,9 @@ protected:
 			vehicle_status_s status{};
 			_status_sub.copy(&status);
 
-			if ((status.timestamp > 0) && (status.arming_state == vehicle_status_s::ARMING_STATE_ARMED)) {
+			// comment out on 21.05.27 by hcnam
+			// if ((status.timestamp > 0) && (status.arming_state == vehicle_status_s::ARMING_STATE_ARMED)) {
+			if ((status.timestamp > 0)) {
 				/* translate the current system state to mavlink state and mode */
 				uint8_t mavlink_state;
 				uint8_t mavlink_base_mode;
@@ -3385,7 +3402,8 @@ protected:
 
 					for (unsigned i = 0; i < 16; i++) {
 						if (act.output[i] > PWM_DEFAULT_MIN / 2) {
-							if (i != 3) {
+							// edited by hcnam on 21.06.07 throttle index is 0
+							if (i != 0) {
 								/* scale PWM out 900..2100 us to -1..1 for normal channels */
 								msg.controls[i] = (act.output[i] - pwm_center) / ((PWM_DEFAULT_MAX - PWM_DEFAULT_MIN) / 2);
 
