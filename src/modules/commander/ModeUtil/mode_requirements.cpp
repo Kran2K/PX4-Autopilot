@@ -82,6 +82,18 @@ void getModeRequirements(uint8_t vehicle_type, failsafe_flags_s &flags)
 	setRequirement(vehicle_status_s::NAVIGATION_STATE_POSITION_SLOW, flags.mode_req_local_position_relaxed);
 	setRequirement(vehicle_status_s::NAVIGATION_STATE_POSITION_SLOW, flags.mode_req_manual_control);
 
+	// NAVIGATION_STATE_KNOB_ROLL
+	setRequirement(vehicle_status_s::NAVIGATION_STATE_KNOB_ROLL, flags.mode_req_angular_velocity);
+	setRequirement(vehicle_status_s::NAVIGATION_STATE_KNOB_ROLL, flags.mode_req_attitude);
+	setRequirement(vehicle_status_s::NAVIGATION_STATE_KNOB_ROLL, flags.mode_req_local_position);
+	setRequirement(vehicle_status_s::NAVIGATION_STATE_KNOB_ROLL, flags.mode_req_local_alt);
+
+	// NAVIGATION_STATE_KNOB_HEADING
+	setRequirement(vehicle_status_s::NAVIGATION_STATE_KNOB_HEADING, flags.mode_req_angular_velocity);
+	setRequirement(vehicle_status_s::NAVIGATION_STATE_KNOB_HEADING, flags.mode_req_attitude);
+	setRequirement(vehicle_status_s::NAVIGATION_STATE_KNOB_HEADING, flags.mode_req_local_position);
+	setRequirement(vehicle_status_s::NAVIGATION_STATE_KNOB_HEADING, flags.mode_req_local_alt);
+
 	// NAVIGATION_STATE_AUTO_MISSION
 	setRequirement(vehicle_status_s::NAVIGATION_STATE_AUTO_MISSION, flags.mode_req_angular_velocity);
 	setRequirement(vehicle_status_s::NAVIGATION_STATE_AUTO_MISSION, flags.mode_req_attitude);

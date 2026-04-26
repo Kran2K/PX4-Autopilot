@@ -75,6 +75,14 @@
                             "name": "rtl",
                             "description": "RTL"
                         },
+                        "64": {
+                            "name": "knob_roll",
+                            "description": "Knob Roll"
+                        },
+                        "128": {
+                            "name": "knob_heading",
+                            "description": "Knob Heading"
+                        },
                         "1024": {
                             "name": "acro",
                             "description": "Acro"
@@ -603,6 +611,14 @@
                         "23": {
                             "name": "external8",
                             "description": "External 8"
+                        },
+                        "24": {
+                            "name": "knob_roll",
+                            "description": "Knob Roll"
+                        },
+                        "25": {
+                            "name": "knob_heading",
+                            "description": "Knob Heading"
                         },
                         "255": {
                             "name": "unknown",

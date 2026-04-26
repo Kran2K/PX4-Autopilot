@@ -185,6 +185,18 @@ void FlightModeManager::start_flight_task()
 		}
 	}
 
+	// Knob mode
+	if ((_vehicle_status_sub.get().nav_state == vehicle_status_s::NAVIGATION_STATE_KNOB_ROLL ||
+	     _vehicle_status_sub.get().nav_state == vehicle_status_s::NAVIGATION_STATE_KNOB_HEADING)
+	    && !_command_failed) {
+		found_some_task = true;
+
+		if (switchTask(FlightTaskIndex::Knob) != FlightTaskError::NoError) {
+			matching_task_running = false;
+			task_failure = true;
+		}
+	}
+
 	// Navigator interface for autonomous modes
 	if (_vehicle_control_mode_sub.get().flag_control_auto_enabled
 	    && !nav_state_descend) {
@@ -301,6 +313,8 @@ void FlightModeManager::handleCommand()
 
 		switch (command.command) {
 		case vehicle_command_s::VEHICLE_CMD_DO_ORBIT:
+		case vehicle_command_s::VEHICLE_CMD_DO_KNOB:
+		case vehicle_command_s::VEHICLE_CMD_UPDATE_KNOB:
 			// The command might trigger a mode switch, and the mode switch can happen before or
 			// after we receive the command here, so we store it for later.
 			memcpy(&_current_command, &command, sizeof(vehicle_command_s));

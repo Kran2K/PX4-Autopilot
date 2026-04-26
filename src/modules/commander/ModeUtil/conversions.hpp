@@ -60,6 +60,10 @@ static inline navigation_mode_t navigation_mode(uint8_t nav_state)
 
 	case vehicle_status_s::NAVIGATION_STATE_POSITION_SLOW: return navigation_mode_t::position_slow;
 
+	case vehicle_status_s::NAVIGATION_STATE_KNOB_ROLL: return navigation_mode_t::knob_roll;
+
+	case vehicle_status_s::NAVIGATION_STATE_KNOB_HEADING: return navigation_mode_t::knob_heading;
+
 	case vehicle_status_s::NAVIGATION_STATE_ACRO: return navigation_mode_t::acro;
 
 	case vehicle_status_s::NAVIGATION_STATE_OFFBOARD: return navigation_mode_t::offboard;

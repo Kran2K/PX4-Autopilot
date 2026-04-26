@@ -180,6 +180,16 @@ void ModeChecks::checkAndReport(const Context &context, Report &reporter)
 		// Already reported
 		reporter.clearCanRunBits((NavModes)reporter.failsafeFlags().mode_req_wind_and_flight_time_compliance);
 	}
+
+	if (context.status().nav_state == vehicle_status_s::NAVIGATION_STATE_KNOB_ROLL &&
+	    context.status().vehicle_type != vehicle_status_s::VEHICLE_TYPE_FIXED_WING) {
+		/* EVENT
+		 */
+		reporter.armingCheckFailure(NavModes::KnobRoll, health_component_t::system,
+					    events::ID("check_modes_knob_roll_fixed_wing_only"),
+					    events::Log::Error, "Knob Roll mode only available for fixed-wing");
+		reporter.clearCanRunBits(NavModes::KnobRoll);
+	}
 }
 
 void ModeChecks::checkArmingRequirement(const Context &context, Report &reporter)

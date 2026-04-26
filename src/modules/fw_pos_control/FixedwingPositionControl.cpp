@@ -196,10 +196,24 @@ FixedwingPositionControl::vehicle_command_poll()
 						   || _control_mode_current == FW_POSCTRL_MODE_MANUAL_POSITION) {
 						_commanded_manual_airspeed_setpoint = vehicle_command.param2;
 					}
-
 				}
 			}
 
+		} else if (vehicle_command.command == vehicle_command_s::VEHICLE_CMD_DO_KNOB ||
+			   vehicle_command.command == vehicle_command_s::VEHICLE_CMD_UPDATE_KNOB) {
+			if (vehicle_command.param7 < 0.0f) {
+				_knob_flag_roll = true;
+				_knob_roll = vehicle_command.param1;
+				_knob_hdg = NAN;
+
+			} else {
+				_knob_flag_roll = false;
+				_knob_hdg = vehicle_command.param1;
+				_knob_roll = NAN;
+			}
+
+			_knob_alt = vehicle_command.param2;
+			_knob_vel = vehicle_command.param3;
 		}
 	}
 }
@@ -784,6 +798,9 @@ FixedwingPositionControl::set_control_mode_current(const hrt_abstime &now)
 			_control_mode_current = FW_POSCTRL_MODE_AUTO_CLIMBRATE;
 		}
 
+	} else if (_vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_KNOB_ROLL ||
+		   _vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_KNOB_HEADING) {
+		_control_mode_current = FW_POSCTRL_MODE_KNOB;
 
 	} else if (_control_mode.flag_control_manual_enabled && _control_mode.flag_control_position_enabled) {
 		if (commanded_position_control_mode != FW_POSCTRL_MODE_MANUAL_POSITION) {
@@ -2253,6 +2270,44 @@ FixedwingPositionControl::control_manual_altitude(const float control_interval, 
 }
 
 void
+FixedwingPositionControl::control_knob(const float control_interval, const Vector2f &ground_speed)
+{
+	float roll_body = 0.0f;
+	float yaw_body = _yaw;
+
+	if (_knob_flag_roll) {
+		roll_body = radians(_knob_roll);
+
+	} else {
+		navigateBearing(Vector2f{_local_pos.x, _local_pos.y}, radians(_knob_hdg), ground_speed, _wind_vel);
+		yaw_body = _target_bearing;
+		roll_body = getCorrectedNpfgRollSetpoint();
+	}
+
+	const bool is_low_height = checkLowHeightConditions();
+
+	const float target_airspeed = adapt_airspeed_setpoint(control_interval, _knob_vel,
+				      _performance_model.getMinimumCalibratedAirspeed(getLoadFactor()), ground_speed);
+
+	tecs_update_pitch_throttle(control_interval,
+				   _knob_alt,
+				   target_airspeed,
+				   radians(_param_fw_p_lim_min.get()),
+				   radians(_param_fw_p_lim_max.get()),
+				   _param_fw_thr_min.get(),
+				   _param_fw_thr_max.get(),
+				   _param_sinkrate_target.get(),
+				   _param_climbrate_target.get(),
+				   is_low_height);
+
+	const float pitch_body = get_tecs_pitch();
+	const Quatf attitude_setpoint(Eulerf(roll_body, pitch_body, yaw_body));
+	attitude_setpoint.copyTo(_att_sp.q_d);
+
+	_att_sp.thrust_body[0] = min(get_tecs_thrust(), _param_fw_thr_max.get());
+}
+
+void
 FixedwingPositionControl::control_manual_position(const float control_interval, const Vector2d &curr_pos,
 		const Vector2f &ground_speed)
 {
@@ -2736,6 +2791,11 @@ FixedwingPositionControl::Run()
 
 		case FW_POSCTRL_MODE_TRANSITION_TO_HOVER_HEADING_HOLD: {
 				control_backtransition_heading_hold();
+				break;
+			}
+
+		case FW_POSCTRL_MODE_KNOB: {
+				control_knob(control_interval, ground_speed);
 				break;
 			}
 		}

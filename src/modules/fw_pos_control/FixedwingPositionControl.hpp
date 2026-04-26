@@ -262,7 +262,8 @@ private:
 		FW_POSCTRL_MODE_MANUAL_ALTITUDE,
 		FW_POSCTRL_MODE_TRANSITION_TO_HOVER_LINE_FOLLOW,
 		FW_POSCTRL_MODE_TRANSITION_TO_HOVER_HEADING_HOLD,
-		FW_POSCTRL_MODE_OTHER
+		FW_POSCTRL_MODE_OTHER,
+		FW_POSCTRL_MODE_KNOB
 	} _control_mode_current{FW_POSCTRL_MODE_OTHER}; // used to check if the mode has changed
 
 	enum StickConfig {
@@ -744,8 +745,17 @@ private:
 	float adapt_airspeed_setpoint(const float control_interval, float calibrated_airspeed_setpoint,
 				      float calibrated_min_airspeed, const Vector2f &ground_speed, bool in_takeoff_situation = false);
 
+	void control_knob(const float control_interval, const Vector2f &ground_speed);
+
 	void reset_takeoff_state();
 	void reset_landing_state();
+
+	/* For Knob mode */
+	float _knob_hdg{0.0f};
+	float _knob_roll{0.0f};
+	float _knob_alt{0.0f};
+	float _knob_vel{0.0f};
+	bool _knob_flag_roll{false}; // true : roll false : heading
 
 	/**
 	 * @brief Decides which control mode to execute.

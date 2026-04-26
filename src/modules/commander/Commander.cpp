@@ -417,6 +417,10 @@ int Commander::custom_command(int argc, char *argv[])
 				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_AUTO,
 						     PX4_CUSTOM_SUB_MODE_EXTERNAL1);
 
+			} else if (!strcmp(argv[1], "knob")) {
+				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_KNOB,
+						     PX4_CUSTOM_SUB_MODE_KNOB_HEADING);
+
 			} else {
 				PX4_ERR("argument %s unsupported.", argv[1]);
 			}
@@ -425,6 +429,28 @@ int Commander::custom_command(int argc, char *argv[])
 
 		} else {
 			PX4_ERR("missing argument");
+		}
+	}
+
+	if (!strcmp(argv[0], "knob_hdg")) {
+		if (argc > 3) {
+			send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_KNOB, atof(argv[1]), atof(argv[2]), atof(argv[3]), NAN,
+					     static_cast<double>(NAN), static_cast<double>(NAN), 1.0f);
+			return 0;
+
+		} else {
+			PX4_ERR("missing arguments: <hdg> <alt> <vel>");
+		}
+	}
+
+	if (!strcmp(argv[0], "knob_roll")) {
+		if (argc > 3) {
+			send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_KNOB, atof(argv[1]), atof(argv[2]), atof(argv[3]), NAN,
+					     static_cast<double>(NAN), static_cast<double>(NAN), -1.0f);
+			return 0;
+
+		} else {
+			PX4_ERR("missing arguments: <roll> <alt> <vel>");
 		}
 	}
 
@@ -868,6 +894,18 @@ Commander::handle_command(const vehicle_command_s &cmd)
 
 				} else if (custom_main_mode == PX4_CUSTOM_MAIN_MODE_OFFBOARD) {
 					desired_nav_state = vehicle_status_s::NAVIGATION_STATE_OFFBOARD;
+
+				} else if (custom_main_mode == PX4_CUSTOM_MAIN_MODE_KNOB) {
+					switch (custom_sub_mode) {
+					case PX4_CUSTOM_SUB_MODE_KNOB_ROLL:
+						desired_nav_state = vehicle_status_s::NAVIGATION_STATE_KNOB_ROLL;
+						break;
+
+					case PX4_CUSTOM_SUB_MODE_KNOB_HEADING:
+					default:
+						desired_nav_state = vehicle_status_s::NAVIGATION_STATE_KNOB_HEADING;
+						break;
+					}
 				}
 
 			} else {
@@ -927,6 +965,23 @@ Commander::handle_command(const vehicle_command_s &cmd)
 				cmd_result = vehicle_command_ack_s::VEHICLE_CMD_RESULT_TEMPORARILY_REJECTED;
 			}
 		}
+		break;
+
+	case vehicle_command_s::VEHICLE_CMD_DO_KNOB: {
+			uint8_t nav_state = (cmd.param7 > 0.5f) ? vehicle_status_s::NAVIGATION_STATE_KNOB_HEADING :
+					    vehicle_status_s::NAVIGATION_STATE_KNOB_ROLL;
+
+			if (_user_mode_intention.change(nav_state, getSourceFromCommand(cmd))) {
+				cmd_result = vehicle_command_ack_s::VEHICLE_CMD_RESULT_ACCEPTED;
+
+			} else {
+				cmd_result = vehicle_command_ack_s::VEHICLE_CMD_RESULT_TEMPORARILY_REJECTED;
+			}
+		}
+		break;
+
+	case vehicle_command_s::VEHICLE_CMD_UPDATE_KNOB:
+		cmd_result = vehicle_command_ack_s::VEHICLE_CMD_RESULT_ACCEPTED;
 		break;
 
 	case vehicle_command_s::VEHICLE_CMD_COMPONENT_ARM_DISARM: {
