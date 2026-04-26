@@ -60,6 +60,7 @@
 #include "mavlink_command_sender.h"
 #include "mavlink_main.h"
 #include "mavlink_receiver.h"
+#include "mavlink_shinil_hil.h"
 
 #include <lib/drivers/device/Device.hpp> // For DeviceId union
 
@@ -356,6 +357,10 @@ MavlinkReceiver::handle_message(mavlink_message_t *msg)
 
 		case MAVLINK_MSG_ID_HIL_OPTICAL_FLOW:
 			handle_message_hil_optical_flow(msg);
+			break;
+
+		case MAVLINK_MSG_ID_ENCAPSULATED_DATA:
+			handle_message_encapsulated_data(msg);
 			break;
 
 		default:
@@ -984,6 +989,207 @@ MavlinkReceiver::handle_message_distance_sensor(mavlink_message_t *msg)
 
 	_distance_sensor_pub.publish(ds);
 }
+
+void
+MavlinkReceiver::handle_message_encapsulated_data(mavlink_message_t *msg)
+{
+	mavlink_encapsulated_data_t encap_msg;
+	mavlink_msg_encapsulated_data_decode(msg, &encap_msg);
+
+	shinil_hil_sim_data_s sim_data_msg;
+	mavlink_shinil_hil_sim_data_decode(encap_msg.data, &sim_data_msg);
+
+	const uint64_t timestamp_sample = hrt_absolute_time();
+
+	//attitude
+	{
+		vehicle_attitude_s hil_attitude{};
+		hil_attitude.timestamp_sample = timestamp_sample;
+		matrix::Quatf q(sim_data_msg.attitude_quaternion);
+		q.copyTo(hil_attitude.q);
+		hil_attitude.timestamp = hrt_absolute_time();
+		_attitude_pub.publish(hil_attitude);
+	}
+
+	//gyro
+	{
+		if (_px4_gyro == nullptr) {
+			// 1310988: DRV_IMU_DEVTYPE_SIM, BUS: 1, ADDR: 1, TYPE: SIMULATION
+			_px4_gyro = new PX4Gyroscope(1310988);
+		}
+
+		if (_px4_gyro != nullptr) {
+			_px4_gyro->set_temperature(sim_data_msg.temperature);
+			_px4_gyro->update(timestamp_sample, sim_data_msg.roll_rate, sim_data_msg.pitch_rate, sim_data_msg.yaw_rate);
+		}
+	}
+
+	//accel
+	{
+		if (_px4_accel == nullptr) {
+			// 1310988: DRV_IMU_DEVTYPE_SIM, BUS: 1, ADDR: 1, TYPE: SIMULATION
+			_px4_accel = new PX4Accelerometer(1310988);
+		}
+
+		if (_px4_accel != nullptr) {
+			_px4_accel->set_temperature(sim_data_msg.temperature);
+			_px4_accel->update(timestamp_sample, sim_data_msg.accel_x, sim_data_msg.accel_y, sim_data_msg.accel_z);
+		}
+	}
+
+	//baro
+	{
+		sensor_baro_s sensor_baro{};
+		sensor_baro.timestamp_sample = timestamp_sample;
+		sensor_baro.device_id = 6620172; // 6620172: DRV_BARO_DEVTYPE_BAROSIM, BUS: 1, ADDR: 4, TYPE: SIMULATION
+		sensor_baro.pressure = sim_data_msg.baro_pressure * 100.0f; // hPa to Pa
+		sensor_baro.temperature = sim_data_msg.temperature;
+		sensor_baro.error_count = 0;
+		sensor_baro.timestamp = hrt_absolute_time();
+		_sensor_baro_pub.publish(sensor_baro);
+	}
+
+	//local position
+	{
+		double lat = sim_data_msg.lat * 1e-7;
+		double lon = sim_data_msg.lon * 1e-7;
+
+		if (!_hil_local_proj_inited) {
+			_hil_local_proj_inited = true;
+			_hil_local_proj_ref.initReference(lat, lon, hrt_absolute_time());
+
+			_hil_ref_timestamp = timestamp_sample;
+			_hil_ref_lat = lat;
+			_hil_ref_lon = lon;
+			_hil_ref_alt = sim_data_msg.alt / 1000.0f;
+		}
+
+		float x = 0.0f;
+		float y = 0.0f;
+		_hil_local_proj_ref.project(lat, lon, x, y);
+
+		vehicle_local_position_s hil_local_pos{};
+		hil_local_pos.timestamp_sample = timestamp_sample;
+
+		hil_local_pos.ref_timestamp = _hil_local_proj_ref.getProjectionReferenceTimestamp();
+		hil_local_pos.ref_lat = _hil_ref_lat;
+		hil_local_pos.ref_lon = _hil_ref_lon;
+		hil_local_pos.ref_alt = _hil_ref_alt;
+		hil_local_pos.xy_valid = true;
+		hil_local_pos.z_valid = true;
+		hil_local_pos.v_xy_valid = true;
+		hil_local_pos.v_z_valid = true;
+		hil_local_pos.x = x;
+		hil_local_pos.y = y;
+		hil_local_pos.z = _hil_ref_alt - sim_data_msg.alt / 1000.0f;
+		hil_local_pos.vx = sim_data_msg.vel_north / 100.0f;
+		hil_local_pos.vy = sim_data_msg.vel_east / 100.0f;
+		hil_local_pos.vz = (sim_data_msg.vel_down * -1.0f) / 100.0f;
+		hil_local_pos.z_deriv = INFINITY;
+		hil_local_pos.dist_bottom = sim_data_msg.alt_agl;
+		hil_local_pos.dist_bottom_valid = true;
+
+		matrix::Eulerf euler{matrix::Quatf(sim_data_msg.attitude_quaternion)};
+		hil_local_pos.heading = euler.psi();
+		hil_local_pos.heading_good_for_control = PX4_ISFINITE(euler.psi());
+		hil_local_pos.xy_global = true;
+		hil_local_pos.z_global = true;
+		hil_local_pos.vxy_max = INFINITY;
+		hil_local_pos.vz_max = INFINITY;
+		hil_local_pos.hagl_min = INFINITY;
+		hil_local_pos.hagl_max_z = INFINITY;
+		hil_local_pos.hagl_max_xy = INFINITY;
+		hil_local_pos.timestamp = hrt_absolute_time();
+
+		_local_pos_pub.publish(hil_local_pos);
+	}
+
+
+	//global position
+	{
+		vehicle_global_position_s hil_gpos{};
+		hil_gpos.timestamp_sample = timestamp_sample;
+
+		hil_gpos.lat = sim_data_msg.lat / (double)1E7;
+		hil_gpos.lon = sim_data_msg.lon / (double)1E7;
+		hil_gpos.alt = sim_data_msg.alt / (float)1E3;
+		hil_gpos.timestamp = hrt_absolute_time();
+
+		_global_pos_pub.publish(hil_gpos);
+	}
+
+	// GPS position
+	{
+		sensor_gps_s gps{};
+
+		device::Device::DeviceId device_id;
+		device_id.devid_s.bus_type = device::Device::DeviceBusType::DeviceBusType_MAVLINK;
+		device_id.devid_s.bus = _mavlink.get_instance_id();
+		device_id.devid_s.address = msg->sysid;
+		device_id.devid_s.devtype = DRV_GPS_DEVTYPE_SIM;
+
+		gps.device_id = device_id.devid;
+
+		gps.timestamp_sample = timestamp_sample;
+		gps.latitude_deg = sim_data_msg.lat / (double)1e7;
+		gps.longitude_deg = sim_data_msg.lon / (double)1e7;
+		gps.altitude_msl_m = (double)(sim_data_msg.alt / 1000.0f);
+		gps.altitude_ellipsoid_m = (double)(sim_data_msg.alt / 1000.0f);
+
+		gps.s_variance_m_s = 0.25f;
+		gps.c_variance_rad = 0.5f;
+		gps.fix_type = 3; // 3D fix
+
+		gps.eph = 2.0f;
+		gps.epv = 4.0f;
+
+		gps.vel_m_s = sqrtf(powf(sim_data_msg.vel_north / 100.0f, 2.0f) + powf(sim_data_msg.vel_east / 100.0f, 2.0f));
+		gps.vel_n_m_s = sim_data_msg.vel_north / 100.0f;
+		gps.vel_e_m_s = sim_data_msg.vel_east / 100.0f;
+		gps.vel_d_m_s = sim_data_msg.vel_down / 100.0f;
+		gps.cog_rad = atan2f(sim_data_msg.vel_east, sim_data_msg.vel_north);
+		gps.vel_ned_valid = true;
+
+		gps.timestamp_time_relative = 0;
+		gps.time_utc_usec = sim_data_msg.time_usec;
+
+		gps.satellites_used = 10;
+
+		gps.heading = NAN;
+		gps.heading_offset = NAN;
+
+		gps.timestamp = hrt_absolute_time();
+
+		_sensor_gps_pub.publish(gps);
+	}
+
+
+	//airspeed
+	{
+		airspeed_s airspeed{};
+		airspeed.timestamp_sample = timestamp_sample;
+		airspeed.indicated_airspeed_m_s = sim_data_msg.cas * 1e-2f;
+		airspeed.true_airspeed_m_s = sim_data_msg.tas * 1e-2f;
+		airspeed.timestamp = hrt_absolute_time();
+
+		_airspeed_pub.publish(airspeed);
+	}
+
+	//airdata
+	{
+		vehicle_air_data_s airdata{};
+
+		airdata.timestamp_sample = timestamp_sample;
+		airdata.baro_device_id = 6620172;
+		airdata.baro_alt_meter = sim_data_msg.alt_baro;
+		airdata.ambient_temperature = sim_data_msg.temperature;
+		airdata.baro_pressure_pa = sim_data_msg.baro_pressure * 100.0f;
+		airdata.timestamp = hrt_absolute_time();
+
+		_air_data_pub.publish(airdata);
+	}
+}
+
 
 void
 MavlinkReceiver::handle_message_att_pos_mocap(mavlink_message_t *msg)

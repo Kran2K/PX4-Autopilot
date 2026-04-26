@@ -100,6 +100,7 @@
 #include <uORB/topics/transponder_report.h>
 #include <uORB/topics/trajectory_setpoint.h>
 #include <uORB/topics/tune_control.h>
+#include <uORB/topics/vehicle_air_data.h>
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/vehicle_command.h>
@@ -166,6 +167,7 @@ private:
 	void handle_message_command_int(mavlink_message_t *msg);
 	void handle_message_command_long(mavlink_message_t *msg);
 	void handle_message_distance_sensor(mavlink_message_t *msg);
+	void handle_message_encapsulated_data(mavlink_message_t *msg);
 	void handle_message_follow_target(mavlink_message_t *msg);
 	void handle_message_generator_status(mavlink_message_t *msg);
 	void handle_message_set_gps_global_origin(mavlink_message_t *msg);
@@ -316,6 +318,7 @@ private:
 	uORB::Publication<open_drone_id_self_id_s>		_open_drone_id_self_id_pub{ORB_ID(open_drone_id_self_id)};
 	uORB::Publication<open_drone_id_system_s>		_open_drone_id_system_pub{ORB_ID(open_drone_id_system)};
 	uORB::Publication<generator_status_s>			_generator_status_pub{ORB_ID(generator_status)};
+	uORB::Publication<vehicle_air_data_s>			_air_data_pub{ORB_ID(vehicle_air_data)};
 	uORB::Publication<vehicle_attitude_s>			_attitude_pub{ORB_ID(vehicle_attitude)};
 	uORB::Publication<vehicle_attitude_setpoint_s>		_att_sp_pub{ORB_ID(vehicle_attitude_setpoint)};
 	uORB::Publication<vehicle_attitude_setpoint_s>		_mc_virtual_att_sp_pub{ORB_ID(mc_virtual_attitude_setpoint)};
@@ -375,6 +378,13 @@ private:
 
 	float _global_local_alt0{NAN};
 	MapProjection _global_local_proj_ref{};
+
+	bool _hil_local_proj_inited{false};
+	MapProjection _hil_local_proj_ref{};
+	double _hil_ref_lat{0};
+	double _hil_ref_lon{0};
+	float _hil_ref_alt{0};
+	uint64_t _hil_ref_timestamp{0};
 
 	hrt_abstime			_last_utm_global_pos_com{0};
 
