@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file led.c
+ * @file px4fmu2_led.c
  *
  * PX4FMU LED backend.
  */
@@ -49,7 +49,7 @@
 #include <arch/board/board.h>
 
 /*
- * Ideally we'd be able to get these from up_internal.h,
+ * Ideally we'd be able to get these from arm_internal.h,
  * but since we want to be able to disable the NuttX use
  * of leds for system indication at will and there is no
  * separate switch, we need to build independent of the
@@ -81,21 +81,18 @@ static uint32_t g_ledmap[] = {
 static uint32_t g_ledmap[] = {
 	GPIO_nLED_BLUE,                     // Indexed by LED_BLUE
 	GPIO_nLED_RED,                      // Indexed by LED_RED, LED_AMBER
-	GPIO_nSAFETY_SWITCH_LED_OUT_INIT,   // Indexed by LED_SAFETY (defaulted to an input)
-	GPIO_nLED_GREEN,                    // Indexed by LED_GREEN
+	0,                                  // Indexed by LED_SAFETY (defaulted to an input)
+	0,                                  // Indexed by LED_GREEN
 };
 
 #endif
 
 __EXPORT void led_init(void)
 {
-	/* Configure LED GPIOs for output */
-	if (!PX4_MFT_HW_SUPPORTED(PX4_MFT_PX4IO)) {
-		g_ledmap[2] = GPIO_nSAFETY_SWITCH_LED_OUT;
-	}
-
 	for (size_t l = 0; l < (sizeof(g_ledmap) / sizeof(g_ledmap[0])); l++) {
-		stm32_configgpio(g_ledmap[l]);
+		if (g_ledmap[l] != 0) {
+			stm32_configgpio(g_ledmap[l]);
+		}
 	}
 }
 
@@ -103,13 +100,19 @@ static void phy_set_led(int led, bool state)
 {
 	/* Drive Low to switch on */
 
-	stm32_gpiowrite(g_ledmap[led], !state);
+	if (g_ledmap[led] != 0) {
+		stm32_gpiowrite(g_ledmap[led], !state);
+	}
 }
 
 static bool phy_get_led(int led)
 {
 	/* If Low it is on */
-	return !stm32_gpioread(g_ledmap[led]);
+	if (g_ledmap[led] != 0) {
+		return !stm32_gpioread(g_ledmap[led]);
+	}
+
+	return false;
 }
 
 __EXPORT void led_on(int led)

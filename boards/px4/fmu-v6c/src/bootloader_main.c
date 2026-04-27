@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019, 2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,49 +31,32 @@
  *
  ****************************************************************************/
 
-#include <px4_arch/i2c_hw_description.h>
+/**
+ * @file bootloader_main.c
+ *
+ * FMU-specific early startup code for bootloader
+*/
 
-#include <lib/drivers/device/Device.hpp>
-#include <px4_platform_common/i2c.h>
+#include "board_config.h"
+#include "bl.h"
 
-constexpr px4_i2c_bus_t px4_i2c_buses[I2C_BUS_MAX_BUS_ITEMS] = {
-	initI2CBusExternal(1),
-	initI2CBusExternal(2),
-	initI2CBusExternal(4),
-};
+#include <nuttx/config.h>
+#include <nuttx/board.h>
+#include <chip.h>
+#include <stm32_uart.h>
+#include <arch/board/board.h>
+#include "arm_internal.h"
+#include <px4_platform_common/init.h>
 
-bool px4_i2c_device_external(const uint32_t device_id)
+extern int sercon_main(int c, char **argv);
+
+void board_late_initialize(void)
 {
-	{
-		// The internal baro and mag on Pixhawk 6C are on an external
-		// bus. On rev 0, the bus is actually exposed externally, on
-		// rev 1+, it is properly internal, however, still marked as
-		// external for compatibility.
+	sercon_main(0, NULL);
+}
 
-		// device_id: 4028193
-		device::Device::DeviceId device_id_baro{};
-		device_id_baro.devid_s.bus_type = device::Device::DeviceBusType_I2C;
-		device_id_baro.devid_s.bus = 4;
-		device_id_baro.devid_s.address = 0x77;
-		device_id_baro.devid_s.devtype = DRV_BARO_DEVTYPE_MS5611;
-
-		if (device_id_baro.devid == device_id) {
-			return false;
-		}
-
-		// device_id: 396321
-		device::Device::DeviceId device_id_mag{};
-		device_id_mag.devid_s.bus_type = device::Device::DeviceBusType_I2C;
-		device_id_mag.devid_s.bus = 4;
-		device_id_mag.devid_s.address = 0xc;
-		device_id_mag.devid_s.devtype = DRV_MAG_DEVTYPE_IST8310;
-
-		if (device_id_mag.devid == device_id) {
-			return false;
-		}
-	}
-
-	device::Device::DeviceId dev_id{};
-	dev_id.devid = device_id;
-	return px4_i2c_bus_external(dev_id.devid_s.bus);
+extern void sys_tick_handler(void);
+void board_timerhook(void)
+{
+	sys_tick_handler();
 }

@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2022 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,10 +35,10 @@
  * @file init.c
  *
  * PX4FMU-specific early startup code.  This file implements the
- * board_app_initializ() function that is called early by nsh during startup.
+ * board_app_initialize() function that is called early by nsh during startup.
  *
  * Code here is run before the rcS script is invoked; it should start required
- * subsystems and perform board-specific initialisation.
+ * subsystems and perform board-specific initialization.
  */
 
 /****************************************************************************
@@ -52,6 +52,7 @@
 #include <string.h>
 #include <debug.h>
 #include <errno.h>
+#include <syslog.h>
 
 #include <nuttx/config.h>
 #include <nuttx/board.h>
@@ -65,10 +66,10 @@
 #include <arch/board/board.h>
 #include "up_internal.h"
 
-#include <px4_arch/io_timer.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_board_led.h>
 #include <systemlib/px4_macros.h>
+#include <px4_arch/io_timer.h>
 #include <px4_platform_common/init.h>
 #include <px4_platform/gpio.h>
 #include <px4_platform/board_determine_hw_info.h>
@@ -77,12 +78,11 @@
 /****************************************************************************
  * Pre-Processor Definitions
  ****************************************************************************/
-#define _GPIO_PULL_DOWN_INPUT(def) (((def) & (GPIO_PORT_MASK | GPIO_PIN_MASK)) | (GPIO_INPUT|GPIO_PULLDOWN|GPIO_SPEED_2MHz))
 
 /* Configuration ************************************************************/
 
 /*
- * Ideally we'd be able to get these from up_internal.h,
+ * Ideally we'd be able to get these from arm_internal.h,
  * but since we want to be able to disable the NuttX use
  * of leds for system indication at will and there is no
  * separate switch, we need to build independent of the
@@ -108,10 +108,6 @@ __EXPORT void board_peripheral_reset(int ms)
 	VDD_5V_PERIPH_EN(false);
 	board_control_spi_sensors_power(false, 0xffff);
 
-	bool last = READ_VDD_3V3_SPEKTRUM_POWER_EN();
-	/* Keep Spektum on to discharge rail*/
-	VDD_3V3_SPEKTRUM_POWER_EN(false);
-
 	/* wait for the peripheral rail to reach GND */
 	usleep(ms * 1000);
 	syslog(LOG_DEBUG, "reset done, %d ms\n", ms);
@@ -119,7 +115,6 @@ __EXPORT void board_peripheral_reset(int ms)
 	/* re-enable power */
 
 	/* switch the peripheral rail back on */
-	VDD_3V3_SPEKTRUM_POWER_EN(last);
 	board_control_spi_sensors_power(true, 0xffff);
 	VDD_5V_PERIPH_EN(true);
 
@@ -139,7 +134,7 @@ __EXPORT void board_peripheral_reset(int ms)
 __EXPORT void board_on_reset(int status)
 {
 	for (int i = 0; i < DIRECT_PWM_OUTPUT_CHANNELS; ++i) {
-		px4_arch_configgpio(PX4_MAKE_GPIO_INPUT(io_timer_channel_get_as_pwm_input(i)));
+		px4_arch_configgpio(io_timer_channel_get_gpio_output(i));
 	}
 
 	if (status >= 0) {
@@ -170,12 +165,10 @@ stm32_boardinitialize(void)
 
 	const uint32_t gpio[] = PX4_GPIO_INIT_LIST;
 	px4_gpio_init(gpio, arraySize(gpio));
-	board_control_spi_sensors_power_configgpio();
 
 	/* configure USB interfaces */
 
 	stm32_usbinitialize();
-
 }
 
 /****************************************************************************
@@ -203,17 +196,13 @@ stm32_boardinitialize(void)
  *
  ****************************************************************************/
 
-
 __EXPORT int board_app_initialize(uintptr_t arg)
 {
+#if !defined(BOOTLOADER)
+
 	/* Power on Interfaces */
-	VDD_3V3_SD_CARD_EN(true);
 	VDD_5V_PERIPH_EN(true);
 	VDD_5V_HIPOWER_EN(true);
-	board_control_spi_sensors_power(true, 0xffff);
-	VDD_3V3_SPEKTRUM_POWER_EN(true);
-	VDD_5V_RC_EN(true);
-	VDD_5V_WIFI_EN(true);
 
 	/* Need hrt running before using the ADC */
 
@@ -228,21 +217,9 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 		syslog(LOG_ERR, "[boot] Failed to read HW revision and version\n");
 	}
 
-	/* configure SPI interfaces (after we determined the HW version) */
-
 	stm32_spiinitialize();
 
-	/* Does this board have CAN 2 or CAN 3 if not decouple the RX
-	 * from IP block Leave TX connected
-	 */
-
-	if (!PX4_MFT_HW_SUPPORTED(PX4_MFT_CAN2)) {
-		px4_arch_configgpio(_GPIO_PULL_DOWN_INPUT(GPIO_CAN2_RX));
-	}
-
-	if (!PX4_MFT_HW_SUPPORTED(PX4_MFT_CAN3)) {
-		px4_arch_configgpio(_GPIO_PULL_DOWN_INPUT(GPIO_CAN3_RX));
-	}
+	board_spi_reset(10, 0xffff);
 
 	/* configure the DMA allocator */
 
@@ -250,44 +227,30 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 		syslog(LOG_ERR, "[boot] DMA alloc FAILED\n");
 	}
 
-#if defined(SERIAL_HAVE_RXDMA)
-	/* set up the serial DMA polling */
+#  if defined(SERIAL_HAVE_RXDMA)
+	// set up the serial DMA polling at 1ms intervals for received bytes that have not triggered a DMA event.
 	static struct hrt_call serial_dma_call;
-
-	/*
-	 * Poll at 1ms intervals for received bytes that have not triggered
-	 * a DMA event.
-	 */
-	struct timespec ts;
-	ts.tv_sec = 0;
-	ts.tv_nsec = 1000000;
-
-	hrt_call_every(&serial_dma_call,
-		       ts_to_abstime(&ts),
-		       ts_to_abstime(&ts),
-		       (hrt_callout)stm32_serial_dma_poll,
-		       NULL);
-#endif
+	hrt_call_every(&serial_dma_call, 1000, 1000, (hrt_callout)stm32_serial_dma_poll, NULL);
+#  endif
 
 	/* initial LED state */
 	drv_led_start();
 	led_off(LED_RED);
-	led_on(LED_GREEN); // Indicate Power.
 	led_off(LED_BLUE);
 
 	if (board_hardfault_init(2, true) != 0) {
 		led_on(LED_RED);
 	}
 
-#ifdef CONFIG_MMCSD
+#  ifdef CONFIG_MMCSD
 	int ret = stm32_sdio_initialize();
 
 	if (ret != OK) {
 		led_on(LED_RED);
-		return ret;
 	}
 
-#endif /* CONFIG_MMCSD */
+#  endif /* CONFIG_MMCSD */
 
+#endif
 	return OK;
 }

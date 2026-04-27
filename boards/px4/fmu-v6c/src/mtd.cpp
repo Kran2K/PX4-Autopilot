@@ -31,49 +31,74 @@
  *
  ****************************************************************************/
 
-#include <px4_arch/i2c_hw_description.h>
-
-#include <lib/drivers/device/Device.hpp>
-#include <px4_platform_common/i2c.h>
-
-constexpr px4_i2c_bus_t px4_i2c_buses[I2C_BUS_MAX_BUS_ITEMS] = {
-	initI2CBusExternal(1),
-	initI2CBusExternal(2),
-	initI2CBusExternal(4),
+#include <nuttx/spi/spi.h>
+#include <px4_platform_common/px4_manifest.h>
+//                                                              KiB BS    nB
+static const px4_mft_device_t spi2 = {             // FM25V02A on FMUM 32K 512 X 64
+	.bus_type = px4_mft_device_t::SPI,
+	.devid    = SPIDEV_FLASH(0)
 };
 
-bool px4_i2c_device_external(const uint32_t device_id)
-{
-	{
-		// The internal baro and mag on Pixhawk 6C are on an external
-		// bus. On rev 0, the bus is actually exposed externally, on
-		// rev 1+, it is properly internal, however, still marked as
-		// external for compatibility.
+static const px4_mft_device_t i2c4 = {             // 24LC64T on IMU   8K 32 X 256
+	.bus_type =  px4_mft_device_t::I2C,
+	.devid    =  PX4_MK_I2C_DEVID(4, 0x50)
+};
 
-		// device_id: 4028193
-		device::Device::DeviceId device_id_baro{};
-		device_id_baro.devid_s.bus_type = device::Device::DeviceBusType_I2C;
-		device_id_baro.devid_s.bus = 4;
-		device_id_baro.devid_s.address = 0x77;
-		device_id_baro.devid_s.devtype = DRV_BARO_DEVTYPE_MS5611;
 
-		if (device_id_baro.devid == device_id) {
-			return false;
+static const px4_mtd_entry_t fmum_fram = {
+	.device = &spi2,
+	.npart = 2,
+	.partd = {
+		{
+			.type = MTD_PARAMETERS,
+			.path = "/fs/mtd_params",
+			.nblocks = 32
+		},
+		{
+			.type = MTD_WAYPOINTS,
+			.path = "/fs/mtd_waypoints",
+			.nblocks = 32
+
 		}
+	},
+};
 
-		// device_id: 396321
-		device::Device::DeviceId device_id_mag{};
-		device_id_mag.devid_s.bus_type = device::Device::DeviceBusType_I2C;
-		device_id_mag.devid_s.bus = 4;
-		device_id_mag.devid_s.address = 0xc;
-		device_id_mag.devid_s.devtype = DRV_MAG_DEVTYPE_IST8310;
-
-		if (device_id_mag.devid == device_id) {
-			return false;
+static const px4_mtd_entry_t imu_eeprom = {
+	.device = &i2c4,
+	.npart = 2,
+	.partd = {
+		{
+			.type = MTD_CALDATA,
+			.path = "/fs/mtd_caldata",
+			.nblocks = 248
+		},
+		{
+			.type = MTD_ID,
+			.path = "/fs/mtd_id",
+			.nblocks = 8 // 256 = 32 * 8
 		}
+	},
+};
+
+static const px4_mtd_manifest_t board_mtd_config = {
+	.nconfigs   = 2,
+	.entries = {
+		&fmum_fram,
+		&imu_eeprom
 	}
+};
 
-	device::Device::DeviceId dev_id{};
-	dev_id.devid = device_id;
-	return px4_i2c_bus_external(dev_id.devid_s.bus);
+static const px4_mft_entry_s mtd_mft = {
+	.type = MTD,
+	.pmft = (void *) &board_mtd_config,
+};
+
+static const px4_mft_s mft = {
+	.nmft = 1,
+	.mfts = &mtd_mft
+};
+
+const px4_mft_s *board_get_manifest(void)
+{
+	return &mft;
 }
