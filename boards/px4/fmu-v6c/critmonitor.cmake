@@ -3,7 +3,7 @@ px4_add_board(
 	PLATFORM nuttx
 	VENDOR px4
 	MODEL fmu-v6c
-	LABEL default
+	LABEL critmonitor
 	TOOLCHAIN arm-none-eabi
 	ARCHITECTURE cortex-m7
 	ROMFSROOT px4fmu_common
@@ -52,7 +52,6 @@ px4_add_board(
 		px4io
 		rc_input
 		roboclaw
-		rpm
 		safety_button
 		tap_esc
 		telemetry # all available telemetry drivers
@@ -67,7 +66,6 @@ px4_add_board(
 		commander
 		dataman
 		ekf2
-		esc_battery
 		events
 		fw_att_control
 		fw_pos_control_l1
@@ -90,13 +88,11 @@ px4_add_board(
 		temperature_compensation
 		vmount
 		vtol_att_control
-		sr_controllaw
 	SYSTEMCMDS
 		bl_update
 		dmesg
 		dumpfile
 		esc_calib
-		gpio
 		hardfault_log
 		i2cdetect
 		led_control
@@ -119,7 +115,6 @@ px4_add_board(
 		ver
 		work_queue
 	EXAMPLES
-		fake_magnetometer
 		fixedwing_control # Tutorial code from https://px4.io/dev/example_fixedwing_control
 		hello
 		hwtest # Hardware test

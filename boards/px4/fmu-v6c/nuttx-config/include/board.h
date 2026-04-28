@@ -1,8 +1,8 @@
 /************************************************************************************
  * nuttx-configs/px4_fmu-v6c/include/board.h
  *
- *   Copyright (C) 2016-2019 Gregory Nutt. All rights reserved.
- *   Authors: David Sidrane <david.sidrane@nscdg.com>
+ *   Copyright (C) 2016-2018 Gregory Nutt. All rights reserved.
+ *   Authors: David Sidrane <david_s5@nscdg.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,7 +38,6 @@
 /************************************************************************************
  * Included Files
  ************************************************************************************/
-
 #include "board_dma_map.h"
 
 #include <nuttx/config.h>
@@ -55,9 +54,9 @@
  ************************************************************************************/
 
 /* Clocking *************************************************************************/
-/* The px4_fmu-v6C  board provides the following clock sources:
+/* The px4_fmu-v6c  board provides the following clock sources:
  *
- *   X1: 16 MHz crystal for HSE
+ *   X301: 16 MHz crystal for HSE
  *
  * So we have these clock source available within the STM32
  *
@@ -70,132 +69,117 @@
 #define STM32_HSI_FREQUENCY     16000000ul
 #define STM32_LSI_FREQUENCY     32000
 #define STM32_HSE_FREQUENCY     STM32_BOARD_XTAL
-#define STM32_LSE_FREQUENCY     32768
+#define STM32_LSE_FREQUENCY     0
 
 /* Main PLL Configuration.
  *
  * PLL source is HSE = 16,000,000
  *
- * PLL_VCOx = (STM32_HSE_FREQUENCY / PLLM) * PLLN
+ * PLL_VCO = (STM32_HSE_FREQUENCY / PLLM) * PLLN
  * Subject to:
  *
- *     1 <= PLLM <= 63
- *     4 <= PLLN <= 512
- *   150 MHz <= PLL_VCOL <= 420MHz
- *   192 MHz <= PLL_VCOH <= 836MHz
+ *     2 <= PLLM <= 63
+ *   192 <= PLLN <= 432
+ *   192 MHz <= PLL_VCO <= 432MHz
  *
  * SYSCLK  = PLL_VCO / PLLP
- * CPUCLK  = SYSCLK / D1CPRE
  * Subject to
  *
- *   PLLP1   = {2, 4, 6, 8, ..., 128}
- *   PLLP2,3 = {2, 3, 4, ..., 128}
- *   CPUCLK <= 480 MHz
- */
-
-#define STM32_BOARD_USEHSE
-
-#define STM32_PLLCFG_PLLSRC      RCC_PLLCKSELR_PLLSRC_HSE
-
-/* PLL1, wide 4 - 8 MHz input, enable DIVP, DIVQ, DIVR
+ *   PLLP = {2, 4, 6, 8}
+ *   SYSCLK <= 216 MHz
  *
- *   PLL1_VCO = (16,000,000 / 1) * 60 = 960 MHz
+ * USB OTG FS, SDMMC and RNG Clock = PLL_VCO / PLLQ
+ * Subject to
+ *   The USB OTG FS requires a 48 MHz clock to work correctly. The SDMMC
+ *   and the random number generator need a frequency lower than or equal
+ *   to 48 MHz to work correctly.
  *
- *   PLL1P = PLL1_VCO/2  = 960 MHz / 2   = 480 MHz
- *   PLL1Q = PLL1_VCO/4  = 960 MHz / 4   = 240 MHz
- *   PLL1R = PLL1_VCO/8  = 960 MHz / 8   = 120 MHz
+ * 2 <= PLLQ <= 15
  */
 
-#define STM32_PLLCFG_PLL1CFG    (RCC_PLLCFGR_PLL1VCOSEL_WIDE | \
-				 RCC_PLLCFGR_PLL1RGE_4_8_MHZ | \
-				 RCC_PLLCFGR_DIVP1EN | \
-				 RCC_PLLCFGR_DIVQ1EN | \
-				 RCC_PLLCFGR_DIVR1EN)
-#define STM32_PLLCFG_PLL1M       RCC_PLLCKSELR_DIVM1(1)
-#define STM32_PLLCFG_PLL1N       RCC_PLL1DIVR_N1(60)
-#define STM32_PLLCFG_PLL1P       RCC_PLL1DIVR_P1(2)
-#define STM32_PLLCFG_PLL1Q       RCC_PLL1DIVR_Q1(4)
-#define STM32_PLLCFG_PLL1R       RCC_PLL1DIVR_R1(8)
-
-#define STM32_VCO1_FREQUENCY     ((STM32_HSE_FREQUENCY / 1) * 60)
-#define STM32_PLL1P_FREQUENCY    (STM32_VCO1_FREQUENCY / 2)
-#define STM32_PLL1Q_FREQUENCY    (STM32_VCO1_FREQUENCY / 4)
-#define STM32_PLL1R_FREQUENCY    (STM32_VCO1_FREQUENCY / 8)
-
-/* PLL2 */
-
-#define STM32_PLLCFG_PLL2CFG     (RCC_PLLCFGR_PLL2VCOSEL_WIDE | \
-				  RCC_PLLCFGR_PLL2RGE_4_8_MHZ | \
-				  RCC_PLLCFGR_DIVP2EN | \
-				  RCC_PLLCFGR_DIVQ2EN | \
-				  RCC_PLLCFGR_DIVR2EN)
-#define STM32_PLLCFG_PLL2M       RCC_PLLCKSELR_DIVM2(4)
-#define STM32_PLLCFG_PLL2N       RCC_PLL2DIVR_N2(48)
-#define STM32_PLLCFG_PLL2P       RCC_PLL2DIVR_P2(2)
-#define STM32_PLLCFG_PLL2Q       RCC_PLL2DIVR_Q2(2)
-#define STM32_PLLCFG_PLL2R       RCC_PLL2DIVR_R2(2)
-
-#define STM32_VCO2_FREQUENCY     ((STM32_HSE_FREQUENCY / 4) * 48)
-#define STM32_PLL2P_FREQUENCY    (STM32_VCO2_FREQUENCY / 2)
-#define STM32_PLL2Q_FREQUENCY    (STM32_VCO2_FREQUENCY / 2)
-#define STM32_PLL2R_FREQUENCY    (STM32_VCO2_FREQUENCY / 2)
-
-/* PLL3 */
-
-#define STM32_PLLCFG_PLL3CFG    (RCC_PLLCFGR_PLL3VCOSEL_WIDE | \
-				 RCC_PLLCFGR_PLL3RGE_4_8_MHZ | \
-				 RCC_PLLCFGR_DIVQ3EN)
-#define STM32_PLLCFG_PLL3M      RCC_PLLCKSELR_DIVM3(4)
-#define STM32_PLLCFG_PLL3N      RCC_PLL3DIVR_N3(48)
-#define STM32_PLLCFG_PLL3P      RCC_PLL3DIVR_P3(2)
-#define STM32_PLLCFG_PLL3Q      RCC_PLL3DIVR_Q3(4)
-#define STM32_PLLCFG_PLL3R      RCC_PLL3DIVR_R3(2)
-
-#define STM32_VCO3_FREQUENCY    ((STM32_HSE_FREQUENCY / 4) * 48)
-#define STM32_PLL3P_FREQUENCY   (STM32_VCO3_FREQUENCY / 2)
-#define STM32_PLL3Q_FREQUENCY   (STM32_VCO3_FREQUENCY / 4)
-#define STM32_PLL3R_FREQUENCY   (STM32_VCO3_FREQUENCY / 2)
-
-/* SYSCLK = PLL1P = 480MHz
- * CPUCLK = SYSCLK / 1 = 480 MHz
+/* Highest SYSCLK with USB OTG FS clock = 48 MHz
+ *
+ * PLL_VCO = (16,000,000 / 8) * 216 = 432 MHz
+ * SYSCLK  = 432 MHz / 2 = 216 MHz
+ * USB OTG FS, SDMMC and RNG Clock = 432 MHz / 9 = 48 MHz
  */
 
-#define STM32_RCC_D1CFGR_D1CPRE  (RCC_D1CFGR_D1CPRE_SYSCLK)
-#define STM32_SYSCLK_FREQUENCY   (STM32_PLL1P_FREQUENCY)
-#define STM32_CPUCLK_FREQUENCY   (STM32_SYSCLK_FREQUENCY / 1)
+#define STM32_PLLCFG_PLLM       RCC_PLLCFG_PLLM(8)
+#define STM32_PLLCFG_PLLN       RCC_PLLCFG_PLLN(216)
+#define STM32_PLLCFG_PLLP       RCC_PLLCFG_PLLP_2
+#define STM32_PLLCFG_PLLQ       RCC_PLLCFG_PLLQ(9)
 
-/* Configure Clock Assignments */
+#define STM32_VCO_FREQUENCY     ((STM32_HSE_FREQUENCY / 8) * 216)
+#define STM32_SYSCLK_FREQUENCY  (STM32_VCO_FREQUENCY / 2)
+#define STM32_OTGFS_FREQUENCY   (STM32_VCO_FREQUENCY / 9)
 
-/* AHB clock (HCLK) is SYSCLK/2 (240 MHz max)
- * HCLK1 = HCLK2 = HCLK3 = HCLK4 = 240
+/* Configure factors for  PLLSAI clock */
+
+#define CONFIG_STM32F7_PLLSAI 1
+#define STM32_RCC_PLLSAICFGR_PLLSAIN    RCC_PLLSAICFGR_PLLSAIN(192)
+#define STM32_RCC_PLLSAICFGR_PLLSAIP    RCC_PLLSAICFGR_PLLSAIP(8)
+#define STM32_RCC_PLLSAICFGR_PLLSAIQ    RCC_PLLSAICFGR_PLLSAIQ(4)
+#define STM32_RCC_PLLSAICFGR_PLLSAIR    RCC_PLLSAICFGR_PLLSAIR(2)
+
+/* Configure Dedicated Clock Configuration Register */
+
+#define STM32_RCC_DCKCFGR1_PLLI2SDIVQ  RCC_DCKCFGR1_PLLI2SDIVQ(1)
+#define STM32_RCC_DCKCFGR1_PLLSAIDIVQ  RCC_DCKCFGR1_PLLSAIDIVQ(1)
+#define STM32_RCC_DCKCFGR1_PLLSAIDIVR  RCC_DCKCFGR1_PLLSAIDIVR(0)
+#define STM32_RCC_DCKCFGR1_SAI1SRC     RCC_DCKCFGR1_SAI1SEL(0)
+#define STM32_RCC_DCKCFGR1_SAI2SRC     RCC_DCKCFGR1_SAI2SEL(0)
+#define STM32_RCC_DCKCFGR1_TIMPRESRC   0
+#define STM32_RCC_DCKCFGR1_DFSDM1SRC   0
+#define STM32_RCC_DCKCFGR1_ADFSDM1SRC  0
+
+
+
+/* Configure factors for  PLLI2S clock */
+
+#define CONFIG_STM32F7_PLLI2S 1
+#define STM32_RCC_PLLI2SCFGR_PLLI2SN   RCC_PLLI2SCFGR_PLLI2SN(192)
+#define STM32_RCC_PLLI2SCFGR_PLLI2SP   RCC_PLLI2SCFGR_PLLI2SP(2)
+#define STM32_RCC_PLLI2SCFGR_PLLI2SQ   RCC_PLLI2SCFGR_PLLI2SQ(2)
+#define STM32_RCC_PLLI2SCFGR_PLLI2SR   RCC_PLLI2SCFGR_PLLI2SR(2)
+
+/* Configure Dedicated Clock Configuration Register 2 */
+
+#define STM32_RCC_DCKCFGR2_USART1SRC  RCC_DCKCFGR2_USART1SEL_APB
+#define STM32_RCC_DCKCFGR2_USART2SRC  RCC_DCKCFGR2_USART2SEL_APB
+#define STM32_RCC_DCKCFGR2_UART4SRC   RCC_DCKCFGR2_UART4SEL_APB
+#define STM32_RCC_DCKCFGR2_UART5SRC   RCC_DCKCFGR2_UART5SEL_APB
+#define STM32_RCC_DCKCFGR2_USART6SRC  RCC_DCKCFGR2_USART6SEL_APB
+#define STM32_RCC_DCKCFGR2_UART7SRC   RCC_DCKCFGR2_UART7SEL_APB
+#define STM32_RCC_DCKCFGR2_UART8SRC   RCC_DCKCFGR2_UART8SEL_APB
+#define STM32_RCC_DCKCFGR2_I2C1SRC    RCC_DCKCFGR2_I2C1SEL_HSI
+#define STM32_RCC_DCKCFGR2_I2C2SRC    RCC_DCKCFGR2_I2C2SEL_HSI
+#define STM32_RCC_DCKCFGR2_I2C3SRC    RCC_DCKCFGR2_I2C3SEL_HSI
+#define STM32_RCC_DCKCFGR2_I2C4SRC    RCC_DCKCFGR2_I2C4SEL_HSI
+#define STM32_RCC_DCKCFGR2_LPTIM1SRC  RCC_DCKCFGR2_LPTIM1SEL_APB
+#define STM32_RCC_DCKCFGR2_CECSRC     RCC_DCKCFGR2_CECSEL_HSI
+#define STM32_RCC_DCKCFGR2_CK48MSRC   RCC_DCKCFGR2_CK48MSEL_PLL
+#define STM32_RCC_DCKCFGR2_SDMMCSRC   RCC_DCKCFGR2_SDMMCSEL_48MHZ
+#define STM32_RCC_DCKCFGR2_SDMMC2SRC  RCC_DCKCFGR2_SDMMC2SEL_48MHZ
+#define STM32_RCC_DCKCFGR2_DSISRC     RCC_DCKCFGR2_DSISEL_PHY
+
+
+/* Several prescalers allow the configuration of the two AHB buses, the
+ * high-speed APB (APB2) and the low-speed APB (APB1) domains. The maximum
+ * frequency of the two AHB buses is 216 MHz while the maximum frequency of
+ * the high-speed APB domains is 108 MHz. The maximum allowed frequency of
+ * the low-speed APB domain is 54 MHz.
  */
 
-#define STM32_RCC_D1CFGR_HPRE   RCC_D1CFGR_HPRE_SYSCLKd2        /* HCLK  = SYSCLK / 2 */
-#define STM32_ACLK_FREQUENCY    (STM32_CPUCLK_FREQUENCY / 2)    /* ACLK in D1, HCLK3 in D1 */
-#define STM32_HCLK_FREQUENCY    (STM32_CPUCLK_FREQUENCY / 2)    /* HCLK in D2, HCLK4 in D3 */
-#define STM32_BOARD_HCLK        STM32_HCLK_FREQUENCY            /* same as above, to satisfy compiler */
+/* AHB clock (HCLK) is SYSCLK (216 MHz) */
 
-/* APB1 clock (PCLK1) is HCLK/2 (120 MHz) */
+#define STM32_RCC_CFGR_HPRE     RCC_CFGR_HPRE_SYSCLK  /* HCLK  = SYSCLK / 1 */
+#define STM32_HCLK_FREQUENCY    STM32_SYSCLK_FREQUENCY
+#define STM32_BOARD_HCLK        STM32_HCLK_FREQUENCY  /* same as above, to satisfy compiler */
 
-#define STM32_RCC_D2CFGR_D2PPRE1  RCC_D2CFGR_D2PPRE1_HCLKd2       /* PCLK1 = HCLK / 2 */
-#define STM32_PCLK1_FREQUENCY     (STM32_HCLK_FREQUENCY/2)
+/* APB1 clock (PCLK1) is HCLK/4 (54 MHz) */
 
-/* APB2 clock (PCLK2) is HCLK/2 (120 MHz) */
-
-#define STM32_RCC_D2CFGR_D2PPRE2  RCC_D2CFGR_D2PPRE2_HCLKd2       /* PCLK2 = HCLK / 2 */
-#define STM32_PCLK2_FREQUENCY     (STM32_HCLK_FREQUENCY/2)
-
-/* APB3 clock (PCLK3) is HCLK/2 (120 MHz) */
-
-#define STM32_RCC_D1CFGR_D1PPRE   RCC_D1CFGR_D1PPRE_HCLKd2        /* PCLK3 = HCLK / 2 */
-#define STM32_PCLK3_FREQUENCY     (STM32_HCLK_FREQUENCY/2)
-
-/* APB4 clock (PCLK4) is HCLK/4 (120 MHz) */
-
-#define STM32_RCC_D3CFGR_D3PPRE   RCC_D3CFGR_D3PPRE_HCLKd2       /* PCLK4 = HCLK / 2 */
-#define STM32_PCLK4_FREQUENCY     (STM32_HCLK_FREQUENCY/2)
-
-/* Timer clock frequencies */
+#define STM32_RCC_CFGR_PPRE1    RCC_CFGR_PPRE1_HCLKd4     /* PCLK1 = HCLK / 4 */
+#define STM32_PCLK1_FREQUENCY   (STM32_HCLK_FREQUENCY/4)
 
 /* Timers driven from APB1 will be twice PCLK1 */
 
@@ -209,111 +193,73 @@
 #define STM32_APB1_TIM13_CLKIN  (2*STM32_PCLK1_FREQUENCY)
 #define STM32_APB1_TIM14_CLKIN  (2*STM32_PCLK1_FREQUENCY)
 
+/* APB2 clock (PCLK2) is HCLK/2 (108MHz) */
+
+#define STM32_RCC_CFGR_PPRE2    RCC_CFGR_PPRE2_HCLKd2     /* PCLK2 = HCLK / 2 */
+#define STM32_PCLK2_FREQUENCY   (STM32_HCLK_FREQUENCY/2)
+
 /* Timers driven from APB2 will be twice PCLK2 */
 
 #define STM32_APB2_TIM1_CLKIN   (2*STM32_PCLK2_FREQUENCY)
 #define STM32_APB2_TIM8_CLKIN   (2*STM32_PCLK2_FREQUENCY)
-#define STM32_APB2_TIM15_CLKIN  (2*STM32_PCLK2_FREQUENCY)
-#define STM32_APB2_TIM16_CLKIN  (2*STM32_PCLK2_FREQUENCY)
-#define STM32_APB2_TIM17_CLKIN  (2*STM32_PCLK2_FREQUENCY)
+#define STM32_APB2_TIM9_CLKIN   (2*STM32_PCLK2_FREQUENCY)
+#define STM32_APB2_TIM10_CLKIN  (2*STM32_PCLK2_FREQUENCY)
+#define STM32_APB2_TIM11_CLKIN  (2*STM32_PCLK2_FREQUENCY)
 
-/* Kernel Clock Configuration
+/* SDMMC dividers.  Note that slower clocking is required when DMA is disabled
+ * in order to avoid RX overrun/TX underrun errors due to delayed responses
+ * to service FIFOs in interrupt driven mode.  These values have not been
+ * tuned!!!
  *
- * Note: look at Table 54 in ST Manual
+ * SDMMCCLK=48MHz, SDMMC_CK=SDMMCCLK/(118+2)=400 KHz
  */
 
-/* I2C123 clock source */
+/* Use the Falling edge of the SDIO_CLK clock to change the edge the
+ * data and commands are change on
+ */
 
-#define STM32_RCC_D2CCIP2R_I2C123SRC RCC_D2CCIP2R_I2C123SEL_HSI
+#define STM32_SDMMC_CLKCR_EDGE STM32_SDMMC_CLKCR_NEGEDGE
 
-/* I2C4 clock source */
+#define STM32_SDMMC_INIT_CLKDIV         (118 << STM32_SDMMC_CLKCR_CLKDIV_SHIFT)
 
-#define STM32_RCC_D3CCIPR_I2C4SRC    RCC_D3CCIPR_I2C4SEL_HSI
+/* DMA ON:  SDMMCCLK=48MHz, SDMMC_CK=SDMMCCLK/(1+2)=16 MHz
+ * DMA OFF: SDMMCCLK=48MHz, SDMMC_CK=SDMMCCLK/(2+2)=12 MHz
+ */
 
-/* SPI123 clock source */
+#ifdef CONFIG_STM32F7_SDMMC_DMA
+#  define STM32_SDMMC_MMCXFR_CLKDIV     (1 << STM32_SDMMC_CLKCR_CLKDIV_SHIFT)
+#else
+#  define STM32_SDMMC_MMCXFR_CLKDIV     (2 << STM32_SDMMC_CLKCR_CLKDIV_SHIFT)
+#endif
 
-#define STM32_RCC_D2CCIP1R_SPI123SRC RCC_D2CCIP1R_SPI123SEL_PLL2
+/* DMA ON:  SDMMCCLK=48MHz, SDMMC_CK=SDMMCCLK/(1+2)=16 MHz
+ * DMA OFF: SDMMCCLK=48MHz, SDMMC_CK=SDMMCCLK/(2+2)=12 MHz
+ */
+//TODO #warning "Check Freq for 24mHz"
 
-/* SPI45 clock source */
-
-#define STM32_RCC_D2CCIP1R_SPI45SRC  RCC_D2CCIP1R_SPI45SEL_PLL2
-
-/* SPI6 clock source */
-
-#define STM32_RCC_D3CCIPR_SPI6SRC    RCC_D3CCIPR_SPI6SEL_PLL2
-
-/* USB 1 and 2 clock source */
-
-#define STM32_RCC_D2CCIP2R_USBSRC    RCC_D2CCIP2R_USBSEL_PLL3
-
-/* ADC 1 2 3 clock source */
-
-#define STM32_RCC_D3CCIPR_ADCSEL     RCC_D3CCIPR_ADCSEL_PLL2
-
-/* FDCAN 1 2 clock source */
-
-#define STM32_RCC_D2CCIP1R_FDCANSEL  RCC_D2CCIP1R_FDCANSEL_HSE   /* FDCAN 1 2 clock source */
-
-#define STM32_FDCANCLK               STM32_HSE_FREQUENCY
+#ifdef CONFIG_STM32F7_SDMMC_DMA
+#  define STM32_SDMMC_SDXFR_CLKDIV      (1 << STM32_SDMMC_CLKCR_CLKDIV_SHIFT)
+#else
+#  define STM32_SDMMC_SDXFR_CLKDIV      (2 << STM32_SDMMC_CLKCR_CLKDIV_SHIFT)
+#endif
 
 /* FLASH wait states
  *
- *  ------------ ---------- -----------
- *  Vcore        MAX ACLK   WAIT STATES
- *  ------------ ---------- -----------
- *  1.15-1.26 V     70 MHz    0
- *  (VOS1 level)   140 MHz    1
- *                 210 MHz    2
- *  1.05-1.15 V     55 MHz    0
- *  (VOS2 level)   110 MHz    1
- *                 165 MHz    2
- *                 220 MHz    3
- *  0.95-1.05 V     45 MHz    0
- *  (VOS3 level)    90 MHz    1
- *                 135 MHz    2
- *                 180 MHz    3
- *                 225 MHz    4
- *  ------------ ---------- -----------
+ *  --------- ---------- -----------
+ *  VDD       MAX SYSCLK WAIT STATES
+ *  --------- ---------- -----------
+ *  1.7-2.1 V   180 MHz    8
+ *  2.1-2.4 V   216 MHz    9
+ *  2.4-2.7 V   216 MHz    8
+ *  2.7-3.6 V   216 MHz    7
+ *  --------- ---------- -----------
  */
 
-#define BOARD_FLASH_WAITSTATES 2
-
-/* SDMMC definitions ********************************************************/
-
-/* Init 400kHz, freq = PLL1Q/(2*div)  div =  PLL1Q/(2*freq) */
-
-#define STM32_SDMMC_INIT_CLKDIV     (300 << STM32_SDMMC_CLKCR_CLKDIV_SHIFT)
-
-/* 25 MHz Max for now, 25 mHZ = PLL1Q/(2*div), div =  PLL1Q/(2*freq)
- * div = 4.8 = 240 / 50, So round up to 5 for default speed 24 MB/s
- */
-
-#if defined(CONFIG_STM32H7_SDMMC_XDMA) || defined(CONFIG_STM32H7_SDMMC_IDMA)
-#  define STM32_SDMMC_MMCXFR_CLKDIV   (5 << STM32_SDMMC_CLKCR_CLKDIV_SHIFT)
-#else
-#  define STM32_SDMMC_MMCXFR_CLKDIV   (100 << STM32_SDMMC_CLKCR_CLKDIV_SHIFT)
-#endif
-#if defined(CONFIG_STM32H7_SDMMC_XDMA) || defined(CONFIG_STM32H7_SDMMC_IDMA)
-#  define STM32_SDMMC_SDXFR_CLKDIV    (5 << STM32_SDMMC_CLKCR_CLKDIV_SHIFT)
-#else
-#  define STM32_SDMMC_SDXFR_CLKDIV    (100 << STM32_SDMMC_CLKCR_CLKDIV_SHIFT)
-#endif
-
-#define STM32_SDMMC_CLKCR_EDGE      STM32_SDMMC_CLKCR_NEGEDGE
+#define BOARD_FLASH_WAITSTATES 7
 
 /* LED definitions ******************************************************************/
-/* The PX4 FMUV6C board has three, LED_GREEN a Green LED, LED_BLUE a Blue LED and
- * LED_RED a Red LED, that can be controlled by software.
- *
- * If CONFIG_ARCH_LEDS is not defined, then the user can control the LEDs in any way.
- * The following definitions are used to access individual LEDs.
- */
-
-/* LED index values for use with board_userled() */
-
-/* LED definitions ******************************************************************/
-/* The px4_fmu-v6c board has three, LED_GREEN a Green LED, LED_BLUE a Blue LED and
- * LED_RED a Red LED, that can be controlled by software.
+/* The px4_fmu-v6c board has numerous LEDs but only three, LED_GREEN a Green LED, LED_BLUE
+ * a Blue LED and LED_RED a Red LED, that can be controlled by software.
  *
  * If CONFIG_ARCH_LEDS is not defined, then the user can control the LEDs in any way.
  * The following definitions are used to access individual LEDs.
@@ -363,59 +309,84 @@
 
 /* Alternate function pin selections ************************************************/
 
-#define GPIO_USART1_RX   GPIO_USART1_RX_2    /* PA10 */
-#define GPIO_USART1_TX   GPIO_USART1_TX_3    /* PB6 */
+#define GPIO_USART1_RX   GPIO_USART1_RX_2    /* PB7 */
+#define GPIO_USART1_TX   GPIO_USART1_TX_2    /* PB6 */
 
-#define GPIO_USART2_RX   GPIO_USART2_RX_1   /* PA3   */
-#define GPIO_USART2_TX   GPIO_USART2_TX_2   /* PD5   */
+#define GPIO_USART2_RX   GPIO_USART2_RX_2   /* PD6 */
+#define GPIO_USART2_TX   GPIO_USART2_TX_2   /* PD5 */
+#define GPIO_USART2_RTS  GPIO_USART2_RTS_2  /* PD4 */
+#define GPIO_USART2_CTS  GPIO_USART2_CTS_2  /* PD3 */
 
-#define GPIO_USART3_RX   GPIO_USART3_RX_3   /* PD9   */
-#define GPIO_USART3_TX   GPIO_USART3_TX_3   /* PD8   */
+#define GPIO_USART3_RX   GPIO_USART3_RX_3   /* PD9  */
+#define GPIO_USART3_TX   GPIO_USART3_TX_3   /* PD8  */
+#define GPIO_USART3_RTS  GPIO_USART3_RTS_2  /* PD12 */
+#define GPIO_USART3_CTS  GPIO_USART3_CTS_2  /* PD11 */
 
-#define GPIO_UART5_RX    GPIO_UART5_RX_3    /* PD2  */
-#define GPIO_UART5_TX    GPIO_UART5_TX_3    /* PC12 */
-// GPIO_UART5_RTS   no remap                /* PC8  */
-// GPIO_UART5_CTS  No remap                 /* PC9  */
+#define GPIO_UART4_RX    GPIO_UART4_RX_4    /* PD0 */
+#define GPIO_UART4_TX    GPIO_UART4_TX_4    /* PD1 */
 
-#define GPIO_USART6_RX   GPIO_USART6_RX_1   /* PC7 */
-#define GPIO_USART6_TX   GPIO_USART6_TX_1   /* PC6  */
+#define GPIO_USART6_RX   GPIO_USART6_RX_2   /* PG9  */
+#define GPIO_USART6_TX   GPIO_USART6_TX_2   /* PG14 */
+#define GPIO_USART6_RTS  GPIO_USART6_RTS_2  /* PG8  */
+#define GPIO_USART6_CTS  GPIO_USART6_CTS_2  /* PG15 */
 
-#define GPIO_UART7_RX    GPIO_UART7_RX_3    /* PE7  */
-#define GPIO_UART7_TX    GPIO_UART7_TX_3    /* PE8  */
-#define GPIO_UART7_RTS   GPIO_UART7_RTS_1   /* PE9  */
-#define GPIO_UART7_CTS   GPIO_UART7_CTS_1   /* PE10 */
+#define GPIO_UART7_RX    GPIO_UART7_RX_2    /* PF6 */
+#define GPIO_UART7_TX    GPIO_UART7_TX_1    /* PE8 */
 
-#define GPIO_UART8_RX    GPIO_UART8_RX_1    /* PE0 */
-#define GPIO_UART8_TX    GPIO_UART8_TX_1    /* PE1 */
-
+/* USART8: has no remap
+ *
+ *      GPIO_UART8_RX                          PE0[CN12-64]
+ *      GPIO_UART8_TX                          PE1[CN11-61]
+ */
 
 /* CAN
  *
  * CAN1 is routed to transceiver.
  * CAN2 is routed to transceiver.
+ * CAN3 is routed to transceiver.
  */
-#define GPIO_CAN1_RX     GPIO_CAN1_RX_3     /* PD0  */
-#define GPIO_CAN1_TX     GPIO_CAN1_TX_3     /* PD1  */
-#define GPIO_CAN2_RX     GPIO_CAN2_RX_2     /* PB5 */
-#define GPIO_CAN2_TX     GPIO_CAN2_TX_1     /* PB13  */
+#define GPIO_CAN1_RX     GPIO_CAN1_RX_5     /* PI9  */
+#define GPIO_CAN1_TX     GPIO_CAN1_TX_4     /* PH13 */
+#define GPIO_CAN2_RX     GPIO_CAN2_RX_1     /* PB12 */
+#define GPIO_CAN2_TX     GPIO_CAN2_TX_1     /* PB13 */
+#define GPIO_CAN3_RX     GPIO_CAN3_RX_1     /* PA8  */
+#define GPIO_CAN3_TX     GPIO_CAN3_TX_1     /* PA15 */
 
 /* SPI
- * SPI1 is sensors
- * SPI2 is FRAM
+ * SPI1 sensors
+ * SPI2 is FRAM.
+ * SPI4 is BARO
+ * SPI6 Reserved
  *
  */
 
-#define ADJ_SLEW_RATE(p) (((p) & ~GPIO_SPEED_MASK) | (GPIO_SPEED_2MHz))
+#define GPIO_SPI1_MISO   GPIO_SPI1_MISO_1   /* PA6 */
+#define GPIO_SPI1_MOSI   GPIO_SPI1_MOSI_3   /* PD7 */
+#define GPIO_SPI1_SCK    GPIO_SPI1_SCK_3    /* PG11 */
 
-#define GPIO_SPI1_MISO   GPIO_SPI1_MISO_1               /* PA6  */
-#define GPIO_SPI1_MOSI   GPIO_SPI1_MOSI_1               /* PA7  */
-#define GPIO_SPI1_SCK    ADJ_SLEW_RATE(GPIO_SPI1_SCK_1) /* PA5  */
+#define GPIO_SPI2_MISO   GPIO_SPI2_MISO_3   /* PI2 */
+#define GPIO_SPI2_MOSI   GPIO_SPI2_MOSI_3   /* PI3 */
+#define GPIO_SPI2_SCK    GPIO_SPI2_SCK_5    /* PI1 */
 
-#define GPIO_SPI2_MISO   GPIO_SPI2_MISO_2               /* PC2  */
-#define GPIO_SPI2_MOSI   GPIO_SPI2_MOSI_3               /* PC3  */
-#define GPIO_SPI2_SCK    ADJ_SLEW_RATE(GPIO_SPI2_SCK_5) /* PD3  */
+#define GPIO_SPI4_MISO   GPIO_SPI4_MISO_2   /* PE13 */
+#define GPIO_SPI4_MOSI   GPIO_SPI4_MOSI_1   /* PE6 */
+#define GPIO_SPI4_SCK    GPIO_SPI4_SCK_1    /* PE2 */
+
+#define GPIO_SPI5_MISO   GPIO_SPI5_MISO_1   /* PF8 */
+#define GPIO_SPI5_MOSI   GPIO_SPI5_MOSI_1   /* PF9 */
+#define GPIO_SPI5_SCK    GPIO_SPI5_SCK_1    /* PF7 */
+
+#define GPIO_SPI6_MISO   GPIO_SPI6_MISO_1   /* PG12 */
+#define GPIO_SPI6_MOSI   GPIO_SPI6_MOSI_3   /* PB5 */
+#define GPIO_SPI6_SCK    GPIO_SPI6_SCK_1    /* PG13 */
 
 /* I2C
+ *
+ *   Each I2C is associated with a U[S]ART
+ *   hence the naming I2C2_SDA_UART4 in FMU USAGE spreadsheet
+ *
+ *
+ *   I2C3 is not pined out on FMUv6c on 144 pin packages
  *
  *   The optional _GPIO configurations allow the I2C driver to manually
  *   reset the bus to clear stuck slaves.  They match the pin configuration,
@@ -423,42 +394,42 @@
  *
  */
 
-#define GPIO_I2C1_SCL GPIO_I2C1_SCL_2       /* PB8  */
-#define GPIO_I2C1_SDA GPIO_I2C1_SDA_1       /* PB7  */
+#define GPIO_I2C1_SCL GPIO_I2C1_SCL_2       /* PB8]  */
+#define GPIO_I2C1_SDA GPIO_I2C1_SDA_2       /* PB9  */
 
 #define GPIO_I2C1_SCL_GPIO                  (GPIO_OUTPUT | GPIO_OPENDRAIN |GPIO_SPEED_50MHz | GPIO_OUTPUT_SET | GPIO_PORTB | GPIO_PIN8)
-#define GPIO_I2C1_SDA_GPIO                  (GPIO_OUTPUT | GPIO_OPENDRAIN |GPIO_SPEED_50MHz | GPIO_OUTPUT_SET | GPIO_PORTB | GPIO_PIN7)
+#define GPIO_I2C1_SDA_GPIO                  (GPIO_OUTPUT | GPIO_OPENDRAIN |GPIO_SPEED_50MHz | GPIO_OUTPUT_SET | GPIO_PORTB | GPIO_PIN9)
 
-#define GPIO_I2C2_SCL GPIO_I2C2_SCL_1       /* PB10 */
-#define GPIO_I2C2_SDA GPIO_I2C2_SDA_1       /* PB11*/
+#define GPIO_I2C2_SCL GPIO_I2C2_SCL_2       /* PF1 */
+#define GPIO_I2C2_SDA GPIO_I2C2_SDA_2       /* PF0 */
 
-#define GPIO_I2C2_SCL_GPIO                  (GPIO_OUTPUT | GPIO_OPENDRAIN |GPIO_SPEED_50MHz | GPIO_OUTPUT_SET | GPIO_PORTB | GPIO_PIN10)
-#define GPIO_I2C2_SDA_GPIO                  (GPIO_OUTPUT | GPIO_OPENDRAIN |GPIO_SPEED_50MHz | GPIO_OUTPUT_SET | GPIO_PORTB | GPIO_PIN11)
+#define GPIO_I2C2_SCL_GPIO                  (GPIO_OUTPUT | GPIO_OPENDRAIN |GPIO_SPEED_50MHz | GPIO_OUTPUT_SET | GPIO_PORTF | GPIO_PIN1)
+#define GPIO_I2C2_SDA_GPIO                  (GPIO_OUTPUT | GPIO_OPENDRAIN |GPIO_SPEED_50MHz | GPIO_OUTPUT_SET | GPIO_PORTF | GPIO_PIN0)
 
-#define GPIO_I2C4_SCL GPIO_I2C4_SCL_1       /* PD12 */
-#define GPIO_I2C4_SDA GPIO_I2C4_SDA_1       /* PD13 */
+#define GPIO_I2C3_SCL GPIO_I2C3_SCL_2       /* PH7 */
+#define GPIO_I2C3_SDA GPIO_I2C3_SDA_2       /* PH8 */
 
-#define GPIO_I2C4_SCL_GPIO                  (GPIO_OUTPUT | GPIO_OPENDRAIN | GPIO_SPEED_50MHz | GPIO_OUTPUT_SET | GPIO_PORTD | GPIO_PIN12)
-#define GPIO_I2C4_SDA_GPIO                  (GPIO_OUTPUT | GPIO_OPENDRAIN | GPIO_SPEED_50MHz | GPIO_OUTPUT_SET | GPIO_PORTD | GPIO_PIN13)
+#define GPIO_I2C3_SCL_GPIO                  (GPIO_OUTPUT | GPIO_OPENDRAIN |GPIO_SPEED_50MHz | GPIO_OUTPUT_SET | GPIO_PORTH | GPIO_PIN7)
+#define GPIO_I2C3_SDA_GPIO                  (GPIO_OUTPUT | GPIO_OPENDRAIN |GPIO_SPEED_50MHz | GPIO_OUTPUT_SET | GPIO_PORTH | GPIO_PIN8)
 
-/* SDMMC2
+#define GPIO_I2C4_SCL GPIO_I2C4_SCL_2       /* PF14 */
+#define GPIO_I2C4_SDA GPIO_I2C4_SDA_2       /* PF15 */
+
+#define GPIO_I2C4_SCL_GPIO                  (GPIO_OUTPUT | GPIO_OPENDRAIN | GPIO_SPEED_50MHz | GPIO_OUTPUT_SET | GPIO_PORTF | GPIO_PIN14)
+#define GPIO_I2C4_SDA_GPIO                  (GPIO_OUTPUT | GPIO_OPENDRAIN | GPIO_SPEED_50MHz | GPIO_OUTPUT_SET | GPIO_PORTF | GPIO_PIN15)
+
+/* SDMMC1
  *
  *      VDD 3.3
  *      GND
- *      SDMMC2_CK                           PD6
- *      SDMMC2_CMD                          PD7
- *      SDMMC2_D0                           PB14
- *      SDMMC2_D1                           PB15
- *      SDMMC2_D2                           PB3
- *      SDMMC2_D3                           PB4
+ *      SDMMC1_CK                           PC12
+ *      SDMMC1_CMD                          PD2
+ *      SDMMC1_D0                           PC8
+ *      SDMMC1_D1                           PC9
+ *      SDMMC1_D2                           PC10
+ *      SDMMC1_D3                           PC11
+ *      GPIO_SDMMC1_NCD                     PG0
  */
-
-#define GPIO_SDMMC2_CK   GPIO_SDMMC2_CK_1  /* PD6  */
-#define GPIO_SDMMC2_CMD  GPIO_SDMMC2_CMD_1 /* PD7  */
-//      GPIO_SDMMC2_D0   No Remap          /* PB14 */
-//      GPIO_SDMMC2_D1   No Remap          /* PB15 */
-#define GPIO_SDMMC2_D2   GPIO_SDMMC2_D2_2  /* PB3  */
-//      GPIO_SDMMC2_D3    No Remap         /* PB4  */
 
 /* USB
  *
@@ -473,14 +444,17 @@
 #if defined(CONFIG_BOARD_USE_PROBES)
 # include "stm32_gpio.h"
 # define PROBE_N(n) (1<<((n)-1))
-# define PROBE_1    (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTA|GPIO_PIN8)   /* PA8  AUX1 */
-# define PROBE_2    (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTE|GPIO_PIN11)  /* PE11 AUX2 */
-# define PROBE_3    (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTE|GPIO_PIN13)  /* PE13 AUX3 */
-# define PROBE_4    (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTE|GPIO_PIN14)  /* PE14 AUX4 */
-# define PROBE_5    (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTD|GPIO_PIN14)  /* PD14 AUX5 */
-# define PROBE_6    (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTD|GPIO_PIN15)  /* PD15 AUX6 */
-# define PROBE_7    (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTA|GPIO_PIN0)   /* PA0  AUX7 */
-# define PROBE_8    (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTA|GPIO_PIN2)   /* PA1  AUX8 */
+# define PROBE_1    (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTE|GPIO_PIN14)  /* PE14 AUX1 */
+# define PROBE_2    (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTA|GPIO_PIN10)  /* PA10 AUX2 */
+# define PROBE_3    (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTE|GPIO_PIN11)  /* PE11 AUX3 */
+# define PROBE_4    (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTE|GPIO_PIN9)   /* PE9  AUX4 */
+# define PROBE_5    (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTD|GPIO_PIN13)  /* PD13 AUX5 */
+# define PROBE_6    (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTD|GPIO_PIN14)  /* PD14 AUX6 */
+# define PROBE_7    (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTH|GPIO_PIN6)   /* PH6  AUX7 */
+# define PROBE_8    (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTH|GPIO_PIN9)   /* PH9  AUX8 */
+# define PROBE_9    (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTA|GPIO_PIN5)   /* PA5  CAP1 */
+# define PROBE_10   (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTB|GPIO_PIN3)   /* PB3  CAP2 */
+# define PROBE_11   (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTB|GPIO_PIN11)  /* PB11 CAP3 */
 
 # define PROBE_INIT(mask) \
 	do { \
@@ -492,6 +466,9 @@
 		if ((mask)& PROBE_N(6)) { stm32_configgpio(PROBE_6); } \
 		if ((mask)& PROBE_N(7)) { stm32_configgpio(PROBE_7); } \
 		if ((mask)& PROBE_N(8)) { stm32_configgpio(PROBE_8); } \
+		if ((mask)& PROBE_N(9)) { stm32_configgpio(PROBE_9); } \
+		if ((mask)& PROBE_N(10)) { stm32_configgpio(PROBE_10); } \
+		if ((mask)& PROBE_N(11)) { stm32_configgpio(PROBE_11); } \
 	} while(0)
 
 # define PROBE(n,s)  do {stm32_gpiowrite(PROBE_##n,(s));}while(0)

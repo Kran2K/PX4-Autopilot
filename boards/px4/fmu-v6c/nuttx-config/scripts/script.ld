@@ -1,7 +1,7 @@
 /****************************************************************************
  * scripts/script.ld
  *
- *   Copyright (C) 2016, 2019 Gregory Nutt. All rights reserved.
+ *   Copyright (C) 2016 Gregory Nutt. All rights reserved.
  *   Author: Gregory Nutt <gnutt@nuttx.org>
  *
  *
@@ -34,92 +34,50 @@
  *
  ****************************************************************************/
 
-/* The PX4 FMUV6C uses an STM32H753II has 2048Kb of main FLASH memory.
- * The flash memory is partitioned into a User Flash memory and a System
- * Flash memory. Each of these memories has two banks:
+/* The STM32F765IIT6 has 2048 KiB of main FLASH memory.  This FLASH memory
+ * can be accessed from either the AXIM interface at address 0x0800:0000 or
+ * from the ITCM interface at address 0x0020:0000.
  *
- *   1) User Flash memory:
+ * Additional information, including the option bytes, is available at at
+ * FLASH at address 0x1ff0:0000 (AXIM) or 0x0010:0000 (ITCM).
  *
- *      Bank 1: Start address 0x0800:0000 to 0x080F:FFFF with 8 sectors, 128Kb each
- *      Bank 2: Start address 0x0810:0000 to 0x081F:FFFF with 8 sectors, 128Kb each
- *
- *   2) System Flash memory:
- *
- *      Bank 1: Start address 0x1FF0:0000 to 0x1FF1:FFFF with 1 x 128Kb sector
- *      Bank 1: Start address 0x1FF4:0000 to 0x1FF5:FFFF with 1 x 128Kb sector
- *
- *   3) User option bytes for user configuration, only in Bank 1.
- *
- * In the STM32H743II, two different boot spaces can be selected through
+ * In the STM32F765IIT6, two different boot spaces can be selected through
  * the BOOT pin and the boot base address programmed in the BOOT_ADD0 and
  * BOOT_ADD1 option bytes:
  *
  *   1) BOOT=0: Boot address defined by user option byte BOOT_ADD0[15:0].
- *      ST programmed value: Flash memory at 0x0800:0000
+ *      ST programmed value: Flash on ITCM at 0x0020:0000
  *   2) BOOT=1: Boot address defined by user option byte BOOT_ADD1[15:0].
- *      ST programmed value: System bootloader at 0x1FF0:0000
+ *      ST programmed value: System bootloader at 0x0010:0000
  *
- * The PX4 FMUV6C has a test point on board, the BOOT0 pin is at ground so by
- * default, the STM32 will boot to address 0x0800:0000 in FLASH unless the test
- * point is pulled to 3.3V.then the boot will be from 0x1FF0:0000
+ * NuttX does not modify these option byes.  On the unmodified NUCLEO-144
+ * board, the BOOT0 pin is at ground so by default, the STM32F765IIT6 will
+ * boot from address 0x0020:0000 in ITCM FLASH.
  *
- * The STM32H743II also has 1024Kb of data SRAM.
- * SRAM is split up into several blocks and into three power domains:
+ * The STM32F765IIT6 also has 512 KiB of data SRAM (in addition to ITCM SRAM).
+ * SRAM is split up into three blocks:
  *
- *   1) TCM SRAMs are dedicated to the Cortex-M7 and are accessible with
- *      0 wait states by the Cortex-M7 and by MDMA through AHBS slave bus
- *
- *      1.1) 128Kb of DTCM-RAM beginning at address 0x2000:0000
- *
- *           The DTCM-RAM is organized as 2 x 64Kb DTCM-RAMs on 2 x 32 bit
- *           DTCM ports. The DTCM-RAM could be used for critical real-time
- *           data, such as interrupt service routines or stack / heap memory.
- *           Both DTCM-RAMs can be used in parallel (for load/store operations)
- *           thanks to the Cortex-M7 dual issue capability.
- *
- *      1.2)  64Kb of ITCM-RAM beginning at address 0x0000:0000
- *
- *           This RAM is connected to ITCM 64-bit interface designed for
- *           execution of critical real-times routines by the CPU.
- *
- *   2) AXI SRAM (D1 domain) accessible by all system masters except BDMA
- *      through D1 domain AXI bus matrix
- *
- *      2.1) 512Kb of SRAM beginning at address 0x2400:0000
- *
- *   3) AHB SRAM (D2 domain) accessible by all system masters except BDMA
- *      through D2 domain AHB bus matrix
- *
- *      3.1) 128Kb of SRAM1 beginning at address 0x3000:0000
- *      3.2) 128Kb of SRAM2 beginning at address 0x3002:0000
- *      3.3)  32Kb of SRAM3 beginning at address 0x3004:0000
- *
- *      SRAM1 - SRAM3 are one contiguous block: 288Kb at address 0x3000:0000
- *
- *   4) AHB SRAM (D3 domain) accessible by most of system masters
- *      through D3 domain AHB bus matrix
- *
- *      4.1)  64Kb of SRAM4 beginning at address 0x3800:0000
- *      4.1)   4Kb of backup RAM beginning at address 0x3880:0000
+ *   1) 128 KiB of DTCM SRM beginning at address 0x2000:0000
+ *   2) 368 KiB of SRAM1 beginning at address 0x2002:0000
+ *   3)  16 KiB of SRAM2 beginning at address 0x2007:c000
  *
  * When booting from FLASH, FLASH memory is aliased to address 0x0000:0000
  * where the code expects to begin execution by jumping to the entry point in
  * the 0x0800:0000 address range.
+ *
+ * Bootloader reserves the first 32K bank (2 Mbytes Flash memory single bank)
+ * organization (256 bits read width)
  */
 
 MEMORY
 {
-	ITCM_RAM  (rwx) : ORIGIN = 0x00000000, LENGTH =   64K
-	FLASH      (rx) : ORIGIN = 0x08020000, LENGTH = 1920K
+    FLASH_ITCM (rx) : ORIGIN = 0x00208000, LENGTH = 2016K
+    FLASH_AXIM (rx) : ORIGIN = 0x08008000, LENGTH = 2016K
 
-	DTCM1_RAM (rwx) : ORIGIN = 0x20000000, LENGTH =   64K
-	DTCM2_RAM (rwx) : ORIGIN = 0x20010000, LENGTH =   64K
-	AXI_SRAM  (rwx) : ORIGIN = 0x24000000, LENGTH =  512K /* D1 domain AXI bus */
-	SRAM1     (rwx) : ORIGIN = 0x30000000, LENGTH =  128K /* D2 domain AHB bus */
-	SRAM2     (rwx) : ORIGIN = 0x30020000, LENGTH =  128K /* D2 domain AHB bus */
-	SRAM3     (rwx) : ORIGIN = 0x30040000, LENGTH =   32K /* D2 domain AHB bus */
-	SRAM4     (rwx) : ORIGIN = 0x38000000, LENGTH =   64K /* D3 domain */
-	BKPRAM    (rwx) : ORIGIN = 0x38800000, LENGTH =    4K
+    ITCM_RAM (rwx) : ORIGIN = 0x00000000, LENGTH = 16K
+    DTCM_RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 128K
+    SRAM1    (rwx) : ORIGIN = 0x20020000, LENGTH = 368K
+    SRAM2    (rwx) : ORIGIN = 0x2007c000, LENGTH = 16K
 }
 
 OUTPUT_ARCH(arm)
@@ -132,7 +90,6 @@ ENTRY(_stext)
  */
 EXTERN(abort)
 EXTERN(_bootdelay_signature)
-EXTERN(board_get_manifest)
 
 SECTIONS
 {
@@ -163,7 +120,7 @@ SECTIONS
 		 * use the NuttX get_errno_ptr() function.
 		 */
 		__errno = get_errno_ptr;
-	} > FLASH
+	} > FLASH_AXIM
 
 	/*
 	 * Init functions (static constructors and the like)
@@ -172,17 +129,25 @@ SECTIONS
 		_sinit = ABSOLUTE(.);
 		KEEP(*(.init_array .init_array.*))
 		_einit = ABSOLUTE(.);
-	} > FLASH
+	} > FLASH_AXIM
 
+	/*
+	 * Construction data for parameters.
+	 */
+	__param ALIGN(4): {
+		__param_start = ABSOLUTE(.);
+		KEEP(*(__param*))
+		__param_end = ABSOLUTE(.);
+	} > FLASH_AXIM
 
 	.ARM.extab : {
 		*(.ARM.extab*)
-	} > FLASH
+	} > FLASH_AXIM
 
 	__exidx_start = ABSOLUTE(.);
 	.ARM.exidx : {
 		*(.ARM.exidx*)
-	} > FLASH
+	} > FLASH_AXIM
 	__exidx_end = ABSOLUTE(.);
 
 	_eronly = ABSOLUTE(.);
@@ -193,12 +158,7 @@ SECTIONS
 		*(.gnu.linkonce.d.*)
 		CONSTRUCTORS
 		_edata = ABSOLUTE(.);
-
-		/* Pad out last section as the STM32H7 Flash write size is 256 bits. 32 bytes */
-		. = ALIGN(16);
-		FILL(0xffff)
-		. += 16;
-	} > AXI_SRAM AT > FLASH  = 0xffff
+	} > SRAM1 AT > FLASH_AXIM
 
 	.bss : {
 		_sbss = ABSOLUTE(.);
@@ -207,16 +167,7 @@ SECTIONS
 		*(COMMON)
 		. = ALIGN(4);
 		_ebss = ABSOLUTE(.);
-	} > AXI_SRAM
-
-	/* Emit the the D3 power domain section for locating BDMA data */
-
-	.sram4_reserve (NOLOAD) :
-	{
-		*(.sram4)
-		. = ALIGN(4);
-		_sram4_heap_start = ABSOLUTE(.);
-	} > SRAM4
+	} > SRAM1
 
 	/* Stabs debugging sections. */
 	.stab 0 : { *(.stab) }
@@ -231,4 +182,13 @@ SECTIONS
 	.debug_line 0 : { *(.debug_line) }
 	.debug_pubnames 0 : { *(.debug_pubnames) }
 	.debug_aranges 0 : { *(.debug_aranges) }
+
+	.ramfunc : {
+		_sramfuncs = .;
+		*(.ramfunc  .ramfunc.*)
+		. = ALIGN(4);
+		_eramfuncs = .;
+	} > ITCM_RAM AT > FLASH_AXIM
+
+	_framfuncs = LOADADDR(.ramfunc);
 }
