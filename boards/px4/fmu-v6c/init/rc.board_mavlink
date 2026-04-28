@@ -1,7 +1,0 @@
-#!/bin/sh
-#
-# PX4 FMUv6c specific board MAVLink startup script.
-#------------------------------------------------------------------------------
-
-# Start MAVLink on the USB port
-mavlink start -b 921600 -d /dev/ttyACM0
